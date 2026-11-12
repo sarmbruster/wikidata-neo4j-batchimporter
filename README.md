@@ -55,7 +55,7 @@ The workflow runs the tests and attaches a ZIP with `tools.jar`, `wikidata-impor
 |---|---|
 | Item, property | `(:Entity:Item)` / `(:Entity:Property)` with `id`, `label`, `slug`, `descriptions`, `aliases` (English only); properties also have `datatype` |
 | Statement with item or property value | `(Entity)-[:<PROPERTY_LABEL> {by, id}]->(Entity)`; `PROPERTY_LABEL` is the upper-cased English label of the property, `CLAIM` if unknown |
-| Statement with any other value | `(Entity)-[:<PROPERTY_LABEL> {by}]->(:Claim:<Datatype>)`, e.g. `:Claim:Quantity`; the statement id is the claim node id |
+| Statement with any other value | `(Entity)-[:<PROPERTY_LABEL> {by}]->(:Claim:<Datatype>)`, e.g. `:Claim:Quantity`; the `id` property holds the statement id |
 | Quantity unit, globe coordinate globe | `(:Quantity)-[:UNIT_TYPE]->(Entity)`, `(:GlobeCoordinate)-[:GLOBE_TYPE]->(Entity)`; `unit` / `globe` are removed from the node when they hold an entity URL |
 
 Qualifiers, references, sitelinks, lexemes and statements whose snak type is not `value` are ignored. Rationale in [docs/adr](docs/adr).
@@ -76,7 +76,8 @@ flowchart LR
 - Pass 1 emits entity and claim nodes and collects `property id -> relationship type`.
 - Pass 2 emits relationships using the complete property index, so properties may appear anywhere in the dump.
 - The importer pulls chunks of raw lines from multiple threads. Parsing and mapping run outside the read lock. Memory use is bounded by `threads x chunk size`.
-- A relationship whose target is missing in the dump goes to the error log. The import continues.
+- Node ids are passed to Neo4j as encoded integers instead of strings, which avoids string hashing and a temporary id store.
+- A relationship whose target is missing in the dump goes to the error log. The import continues. Claim nodes appear there as `<entity>#<statement position>`, e.g. `Q100#3`.
 
 ## Limitations
 

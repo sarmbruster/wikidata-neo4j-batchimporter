@@ -9,7 +9,6 @@ import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Queue;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import org.neo4j.batchimport.api.InputIterable;
 import org.neo4j.batchimport.api.InputIterator;
@@ -22,14 +21,21 @@ final class DumpInputIterable<R> implements InputIterable {
     private final int chunkSize;
     private final EntityParser parser;
     private final Function<Entity, List<R>> mapper;
-    private final BiConsumer<R, InputEntityVisitor> visit;
+    private final Visit<R> visit;
+
+    @FunctionalInterface
+    interface Visit<R> {
+
+        /** Feeds the record to the visitor; returns false if the record was skipped and nothing was visited. */
+        boolean accept(R record, InputEntityVisitor visitor);
+    }
 
     DumpInputIterable(
             DumpSource source,
             int chunkSize,
             EntityParser parser,
             Function<Entity, List<R>> mapper,
-            BiConsumer<R, InputEntityVisitor> visit) {
+            Visit<R> visit) {
         this.source = source;
         this.chunkSize = chunkSize;
         this.parser = parser;
@@ -89,15 +95,18 @@ final class DumpInputIterable<R> implements InputIterable {
 
         @Override
         public boolean next(InputEntityVisitor visitor) throws IOException {
-            while (pending.isEmpty()) {
-                if (nextLine >= lines.size()) {
-                    return false;
+            while (true) {
+                while (pending.isEmpty()) {
+                    if (nextLine >= lines.size()) {
+                        return false;
+                    }
+                    parser.parse(lines.get(nextLine++)).map(mapper).ifPresent(pending::addAll);
                 }
-                parser.parse(lines.get(nextLine++)).map(mapper).ifPresent(pending::addAll);
+                if (visit.accept(pending.poll(), visitor)) {
+                    visitor.endOfEntity();
+                    return true;
+                }
             }
-            visit.accept(pending.poll(), visitor);
-            visitor.endOfEntity();
-            return true;
         }
 
         @Override

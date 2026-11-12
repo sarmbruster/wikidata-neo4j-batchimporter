@@ -53,12 +53,16 @@ public final class WikidataInput implements Input {
     @Override
     public InputIterable relationships(Collector collector) {
         return new DumpInputIterable<RelationshipRecord>(
-                source, chunkSize, parser, relationshipMapper::map, this::visitRelationship);
+                source,
+                chunkSize,
+                parser,
+                relationshipMapper::map,
+                (relationship, visitor) -> visitRelationship(relationship, visitor, collector));
     }
 
     @Override
     public IdType idType() {
-        return IdType.STRING;
+        return IdType.INTEGER;
     }
 
     @Override
@@ -96,16 +100,34 @@ public final class WikidataInput implements Input {
         };
     }
 
-    private void visitNode(NodeRecord node, InputEntityVisitor visitor) {
-        visitor.id(node.id(), group);
+    private boolean visitNode(NodeRecord node, InputEntityVisitor visitor) {
+        visitor.id(InputIds.encode(node.id()), group);
         visitor.labels(node.labels().toArray(String[]::new));
         node.properties().forEach(visitor::property);
+        return true;
     }
 
-    private void visitRelationship(RelationshipRecord relationship, InputEntityVisitor visitor) {
-        visitor.startId(relationship.startId(), group);
-        visitor.endId(relationship.endId(), group);
+    private boolean visitRelationship(
+            RelationshipRecord relationship, InputEntityVisitor visitor, Collector collector) {
+        long startId;
+        long endId;
+        try {
+            startId = InputIds.encode(relationship.startId());
+            endId = InputIds.encode(relationship.endId());
+        } catch (IllegalArgumentException e) {
+            collector.collectBadRelationship(
+                    relationship.startId(),
+                    group,
+                    relationship.type(),
+                    relationship.endId(),
+                    group,
+                    e.getMessage());
+            return false;
+        }
+        visitor.startId(startId, group);
+        visitor.endId(endId, group);
         visitor.type(relationship.type());
         relationship.properties().forEach(visitor::property);
+        return true;
     }
 }

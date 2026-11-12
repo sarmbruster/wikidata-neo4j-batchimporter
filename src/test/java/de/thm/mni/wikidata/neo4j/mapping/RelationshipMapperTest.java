@@ -40,19 +40,19 @@ class RelationshipMapperTest {
     }
 
     @Test
-    void linksEntityToClaimNodeWithStatementIdAsTarget() {
+    void linksEntityToClaimNodeKeyedByOwnerAndStatementPosition() {
         assertThat(mapper.map(entities.get("Q100")))
                 .contains(
-                        new RelationshipRecord("Q100", "Q100$4", "AREA", Map.of("by", "P2046")),
-                        new RelationshipRecord("Q100", "Q100$5", "COORDINATE_LOCATION", Map.of("by", "P625")));
+                        new RelationshipRecord("Q100", "Q100#3", "AREA", Map.of("by", "P2046")),
+                        new RelationshipRecord("Q100", "Q100#4", "COORDINATE_LOCATION", Map.of("by", "P625")));
     }
 
     @Test
     void linksQuantityAndGlobeCoordinateToTheirEntities() {
         assertThat(mapper.map(entities.get("Q100")))
                 .contains(
-                        new RelationshipRecord("Q100$4", "Q712226", "UNIT_TYPE", Map.of()),
-                        new RelationshipRecord("Q100$5", "Q2", "GLOBE_TYPE", Map.of()));
+                        new RelationshipRecord("Q100#3", "Q712226", "UNIT_TYPE", Map.of()),
+                        new RelationshipRecord("Q100#4", "Q2", "GLOBE_TYPE", Map.of()));
     }
 
     @Test

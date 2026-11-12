@@ -18,7 +18,9 @@ public class RelationshipMapper {
 
     public List<RelationshipRecord> map(Entity entity) {
         List<RelationshipRecord> relationships = new ArrayList<>();
-        for (Statement statement : entity.statements()) {
+        List<Statement> statements = entity.statements();
+        for (int index = 0; index < statements.size(); index++) {
+            Statement statement = statements.get(index);
             String type = propertyIndex.typeOf(statement.propertyId());
             switch (statement.value()) {
                 case EntityRef ref -> relationships.add(new RelationshipRecord(
@@ -27,9 +29,10 @@ public class RelationshipMapper {
                         type,
                         Map.of("by", statement.propertyId(), "id", statement.id())));
                 case ClaimValue claim -> {
-                    relationships.add(new RelationshipRecord(
-                            entity.id(), statement.id(), type, Map.of("by", statement.propertyId())));
-                    addTypeRelationship(relationships, statement.id(), claim);
+                    String claimKey = NodeMapper.claimKey(entity.id(), index);
+                    relationships.add(
+                            new RelationshipRecord(entity.id(), claimKey, type, Map.of("by", statement.propertyId())));
+                    addTypeRelationship(relationships, claimKey, claim);
                 }
             }
         }

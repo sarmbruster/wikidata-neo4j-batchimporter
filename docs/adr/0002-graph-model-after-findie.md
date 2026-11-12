@@ -16,6 +16,6 @@ We adopt the model of https://github.com/findie/wikidata-neo4j-importer:
 Qualifiers, references, sitelinks, lexemes and snaks with `snaktype` other than `value` are not adopted.
 
 ## Consequences
-- The statement id serves as the id of the claim node so that the relationships can find the nodes again.
+- The claim node carries the statement id in its `id` property. During the import it is identified by its owning entity and the position of the statement ([ADR 0006](0006-integer-input-ids.md)).
 - The graph stays considerably smaller than with a complete model.
 - `unit` and `globe` are removed already when the claim node is created if they contain an entity URL (start with `http`). Unlike in findie, it is not yet known in the first pass whether the target exists. If it is missing in the dump, the value on the node is lost, but remains traceable through the entry in the error log. Values such as `unit: "1"` are kept.

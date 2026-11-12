@@ -53,7 +53,7 @@ public final class ImporterRunner {
                             config,
                             new Monitor() {},
                             scheduler,
-                            collector,
+                            new ReadableIdCollector(collector),
                             TransactionLogInitializer.getLogFilesInitializer(),
                             new IndexImporterFactoryImpl(),
                             EmptyMemoryTracker.INSTANCE,

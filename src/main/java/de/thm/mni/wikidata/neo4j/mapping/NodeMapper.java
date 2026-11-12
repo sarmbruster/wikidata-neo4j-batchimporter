@@ -27,9 +27,11 @@ public class NodeMapper {
         propertyIndex.register(entity);
         List<NodeRecord> nodes = new ArrayList<>();
         nodes.add(entityNode(entity));
-        for (Statement statement : entity.statements()) {
+        List<Statement> statements = entity.statements();
+        for (int index = 0; index < statements.size(); index++) {
+            Statement statement = statements.get(index);
             if (statement.value() instanceof ClaimValue claim) {
-                nodes.add(claimNode(statement.id(), claim));
+                nodes.add(claimNode(claimKey(entity.id(), index), statement.id(), claim));
             }
         }
         return nodes;
@@ -49,7 +51,11 @@ public class NodeMapper {
         return new NodeRecord(entity.id(), List.of(ENTITY_LABEL, typeLabel), properties);
     }
 
-    private NodeRecord claimNode(String statementId, ClaimValue claim) {
+    static String claimKey(String entityId, int statementIndex) {
+        return entityId + "#" + statementIndex;
+    }
+
+    private NodeRecord claimNode(String nodeKey, String statementId, ClaimValue claim) {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("id", statementId);
         claim.fields().forEach((key, value) -> {
@@ -57,7 +63,7 @@ public class NodeMapper {
                 properties.put(key, storable(value));
             }
         });
-        return new NodeRecord(statementId, List.of(CLAIM_LABEL, Naming.claimLabel(claim.datatype())), properties);
+        return new NodeRecord(nodeKey, List.of(CLAIM_LABEL, Naming.claimLabel(claim.datatype())), properties);
     }
 
     static boolean isEntityReference(String key, Object value) {

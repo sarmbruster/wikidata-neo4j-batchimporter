@@ -73,6 +73,42 @@ class WikidataInputTest {
     }
 
     @Test
+    void writesRelationshipWithUnencodableTargetToTheErrorLogAndContinues() throws Exception {
+        Path dump = home.resolve("invalid.json");
+        java.nio.file.Files.writeString(dump, """
+                [
+                {"type":"item","id":"Q1","labels":{"en":{"language":"en","value":"one"}},"claims":{"P31":[{"mainsnak":{"snaktype":"value","property":"P31","datatype":"wikibase-item","datavalue":{"value":{"entity-type":"item","id":"Qbroken"},"type":"wikibase-entityid"}},"type":"statement","id":"Q1$1"}],"P279":[{"mainsnak":{"snaktype":"value","property":"P279","datatype":"wikibase-item","datavalue":{"value":{"entity-type":"item","id":"Q2"},"type":"wikibase-entityid"}},"type":"statement","id":"Q1$2"}]}},
+                {"type":"item","id":"Q2","labels":{"en":{"language":"en","value":"two"}}}
+                ]
+                """);
+        var errorLog = new ByteArrayOutputStream();
+        var collector = Collectors.badCollector(errorLog, BadCollector.UNLIMITED_TOLERANCE);
+
+        ImporterRunner.run(new WikidataInput(new DumpSource(dump, Compression.NONE), 1000), home, collector, null);
+
+        assertThat(collector.badEntries()).isEqualTo(1);
+        assertThat(errorLog.toString(StandardCharsets.UTF_8)).contains("Qbroken");
+        assertThat(Neo4jHome.count(home, "MATCH (:Item {id:'Q1'})-[r]->(:Item {id:'Q2'}) RETURN count(r) AS c"))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void storesTheStatementIdOnClaimNodes() throws Exception {
+        var collector = Collectors.badCollector(new ByteArrayOutputStream(), BadCollector.UNLIMITED_TOLERANCE);
+
+        ImporterRunner.run(
+                new WikidataInput(new DumpSource(Fixtures.path(Fixtures.MIXED), Compression.AUTO), 1000),
+                home,
+                collector,
+                null);
+
+        assertThat(Neo4jHome.count(
+                        home,
+                        "MATCH (:Item {id:'Q100'})-[:AREA]->(c:Claim {id:'Q100$4'}) RETURN count(c) AS c"))
+                .isEqualTo(1);
+    }
+
+    @Test
     void estimatesGrowWithFileSizeAndAreNeverZero() throws Exception {
         Path small = home.resolve("small.json");
         Path large = home.resolve("large.json");

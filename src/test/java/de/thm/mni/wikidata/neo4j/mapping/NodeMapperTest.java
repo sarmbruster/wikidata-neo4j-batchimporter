@@ -47,10 +47,10 @@ class NodeMapperTest {
     }
 
     @Test
-    void createsClaimNodesOnlyForNonEntityValues() {
+    void createsClaimNodesOnlyForNonEntityValuesKeyedByOwnerAndStatementPosition() {
         List<NodeRecord> nodes = mapper.map(entities.get("Q100"));
 
-        assertThat(nodes).extracting(NodeRecord::id).containsExactly("Q100", "Q100$4", "Q100$5");
+        assertThat(nodes).extracting(NodeRecord::id).containsExactly("Q100", "Q100#3", "Q100#4");
     }
 
     @Test
