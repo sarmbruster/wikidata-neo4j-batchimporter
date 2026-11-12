@@ -18,3 +18,4 @@ Nicht übernommen werden Qualifiers, References, Sitelinks, Lexemes und Snaks mi
 ## Konsequenzen
 - Die Statement-Id dient als Id des Claim-Knotens, damit die Kanten die Knoten wiederfinden.
 - Der Graph bleibt deutlich kleiner als bei einem vollständigen Modell.
+- `unit` und `globe` werden schon beim Anlegen des Claim-Knotens entfernt, wenn sie eine Entity-URL enthalten (beginnen mit `http`). Anders als bei findie steht im ersten Durchlauf noch nicht fest, ob das Ziel existiert. Fehlt es im Dump, geht der Wert auf dem Knoten verloren, bleibt aber über den Eintrag im Error-Log nachvollziehbar. Werte wie `unit: "1"` bleiben erhalten.

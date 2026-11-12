@@ -3,21 +3,15 @@ package de.thm.mni.wikidata.neo4j.parse;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.thm.mni.wikidata.neo4j.dump.Compression;
-import de.thm.mni.wikidata.neo4j.dump.DumpSource;
+import de.thm.mni.wikidata.neo4j.Fixtures;
 import de.thm.mni.wikidata.neo4j.model.DataValue.ClaimValue;
 import de.thm.mni.wikidata.neo4j.model.DataValue.EntityRef;
 import de.thm.mni.wikidata.neo4j.model.Entity;
 import de.thm.mni.wikidata.neo4j.model.EntityType;
 import de.thm.mni.wikidata.neo4j.model.Statement;
-import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +20,7 @@ class EntityParserTest {
     private final EntityParser parser = new EntityParser();
 
     @Test
-    void parsesBelgiumFromTheDumpFixture() throws Exception {
+    void parsesBelgiumFromTheDumpFixture() {
         Entity belgium = parse(records("/wikidata-100.json", 1).getFirst());
 
         assertThat(belgium.id()).isEqualTo("Q31");
@@ -38,7 +32,7 @@ class EntityParserTest {
     }
 
     @Test
-    void countsStatementsPerDatatypeForBelgium() throws Exception {
+    void countsStatementsPerDatatypeForBelgium() {
         Entity belgium = parse(records("/wikidata-100.json", 1).getFirst());
 
         Map<String, Long> perKind = belgium.statements().stream()
@@ -64,7 +58,7 @@ class EntityParserTest {
     }
 
     @Test
-    void parsesAllRecordsOfTheDumpFixture() throws Exception {
+    void parsesAllRecordsOfTheDumpFixture() {
         List<Entity> entities = records("/wikidata-100.json", Integer.MAX_VALUE).stream()
                 .map(this::parse)
                 .toList();
@@ -76,7 +70,7 @@ class EntityParserTest {
     }
 
     @Test
-    void parsesPropertiesAndTreatsEmptyArraysAsMissing() throws Exception {
+    void parsesPropertiesAndTreatsEmptyArraysAsMissing() {
         Map<String, Entity> byId = mixed();
 
         Entity instanceOf = byId.get("P31");
@@ -89,7 +83,7 @@ class EntityParserTest {
     }
 
     @Test
-    void readsOnlyEnglishTexts() throws Exception {
+    void readsOnlyEnglishTexts() {
         Entity germany = mixed().get("Q300");
 
         assertThat(germany.label()).isEqualTo("Germany");
@@ -97,7 +91,7 @@ class EntityParserTest {
     }
 
     @Test
-    void mapsEntityReferencesAndClaimValues() throws Exception {
+    void mapsEntityReferencesAndClaimValues() {
         Entity berlin = mixed().get("Q100");
 
         assertThat(berlin.statements()).extracting(Statement::id).containsExactly("Q100$1", "Q100$2", "Q100$3", "Q100$4", "Q100$5");
@@ -112,7 +106,7 @@ class EntityParserTest {
     }
 
     @Test
-    void wrapsPlainValuesAndSkipsSomevalueSnaks() throws Exception {
+    void wrapsPlainValuesAndSkipsSomevalueSnaks() {
         Entity germany = mixed().get("Q300");
 
         assertThat(germany.statements()).extracting(Statement::id).containsExactly("Q300$1", "Q300$2", "Q300$4", "Q300$5");
@@ -139,21 +133,11 @@ class EntityParserTest {
         return parser.parse(json).orElseThrow();
     }
 
-    private Map<String, Entity> mixed() throws Exception {
-        return records("/mixed.json", Integer.MAX_VALUE).stream()
-                .map(this::parse)
-                .collect(Collectors.toMap(Entity::id, Function.identity()));
+    private Map<String, Entity> mixed() {
+        return Fixtures.entities(Fixtures.MIXED);
     }
 
-    private List<String> records(String resource, int max) throws IOException, URISyntaxException {
-        Path file = Path.of(getClass().getResource(resource).toURI());
-        List<String> records = new ArrayList<>();
-        try (var reader = new DumpSource(file, Compression.AUTO).open()) {
-            List<String> chunk;
-            while (records.size() < max && !(chunk = reader.readChunk(100)).isEmpty()) {
-                records.addAll(chunk);
-            }
-        }
-        return records.size() > max ? records.subList(0, max) : records;
+    private List<String> records(String resource, int max) {
+        return Fixtures.records(resource, max);
     }
 }
