@@ -1,14 +1,14 @@
-# 1. Neo4j 5 mit internem BatchImporter
+# 1. Neo4j 5 with the internal BatchImporter
 
-Status: akzeptiert
+Status: accepted
 
-## Kontext
-Die Datenbank soll auf Java-Ebene mit dem Neo4j-Batchimporter erzeugt werden. Die alte `BatchInserter`-API existiert ab Neo4j 5 nicht mehr.
+## Context
+The database is to be created on the Java level with the Neo4j batch importer. The old `BatchInserter` API no longer exists as of Neo4j 5.
 
-## Entscheidung
-Neo4j 5.26 (LTS, Community) mit dem internen `org.neo4j.internal.batchimport.BatchImporter`, erzeugt über die `BatchImporterFactory`. Knoten-Ids sind Strings (`IdType.STRING`), also die Wikidata-Ids bzw. Statement-Ids.
+## Decision
+Neo4j 5.26 (LTS, Community) with the internal `org.neo4j.internal.batchimport.BatchImporter`, created via the `BatchImporterFactory`. Node ids are strings (`IdType.STRING`), i.e. the Wikidata ids and statement ids respectively.
 
-## Konsequenzen
-- Die API ist intern und kann sich zwischen Neo4j-Versionen ändern. Die Neo4j-Version ist deshalb im `pom.xml` fest gepinnt.
-- Neo4j 5.26 ist für Java 21 ausgelegt, daher `release 21`.
-- Ein Spike-Test sichert den Vertrag des Importers ab (je ein Durchlauf über Knoten und Kanten, alle Knoten vor der ersten Kante).
+## Consequences
+- The API is internal and may change between Neo4j versions. The Neo4j version is therefore pinned in `pom.xml`.
+- Neo4j 5.26 is designed for Java 21, hence `release 21`.
+- A spike test secures the contract of the importer (one pass each over nodes and relationships, all nodes before the first relationship).

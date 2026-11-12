@@ -1,109 +1,109 @@
-# Plan: Paketstruktur & Implementierungsschritte (wikidata-neo4j-batchimporter)
+# Plan: Package structure and implementation steps (wikidata-neo4j-batchimporter)
 
 ## Context
-Das Repo ist bisher leer bis auf `SPEC.md`, `CLAUDE.md` und das Fixture `src/test/resources/wikidata-100.json` (99 Items, keine Properties, eine Zeile pro Record, umschlossen von `[` / `]`).
-Ziel laut SPEC: CLI `java -jar tools.jar <json-file> <pfad>` (aufgerufen über ein Shellscript) erzeugt mit dem Neo4j-Batchimporter auf Java-Ebene eine valide, nicht leere Neo4j-Datenbank.
+So far the repo is empty except for `SPEC.md`, `CLAUDE.md` and the fixture `src/test/resources/wikidata-100.json` (99 items, no properties, one record per line, enclosed in `[` / `]`).
+Goal according to SPEC: a CLI `java -jar tools.jar <json-file> <path>` (called via a shell script) creates a valid, non-empty Neo4j database with the Neo4j batch importer on the Java level.
 
-Getroffene Entscheidungen:
+Decisions made:
 - Neo4j 5.x Community (5.26 LTS)
-- Graphmodell wie bei findie/wikidata-neo4j-importer
-- Base-Package `de.thm.mni.wikidata.neo4j`
-- Dependencies Jackson und commons-compress (bz2), Fat-JAR über maven-shade-plugin
-- Nicht auflösbare Relationships kommen ins Error-Log.
-- **Die Datei wird zweimal gelesen:** im ersten Durchlauf nur Knoten, im zweiten nur Kanten. Es gibt keine großen Zwischenpuffer.
+- Graph model as in findie/wikidata-neo4j-importer
+- Base package `de.thm.mni.wikidata.neo4j`
+- Dependencies Jackson and commons-compress (bz2), fat JAR via maven-shade-plugin
+- Unresolvable relationships go to the error log.
+- **The file is read twice:** only nodes in the first pass, only relationships in the second. There are no large intermediate buffers.
 
-## Architektur: zwei Durchläufe, direkt vom Importer gezogen
+## Architecture: two passes, pulled directly by the importer
 
-Der Neo4j-Importer arbeitet sequenziell: `importNodes()` → `prepareIdMapper()` → `importRelationships()`. Das ist im Quellcode `ParallelBatchImporter.doImport` (5.25/dev) geprüft. Daraus ergibt sich das Design:
+The Neo4j importer works sequentially: `importNodes()` → `prepareIdMapper()` → `importRelationships()`. This was verified in the source code `ParallelBatchImporter.doImport` (5.25/dev). The design follows from that:
 
-- **`Input.nodes()`** öffnet den Dump und liefert nur Knoten:
-  - `:Entity:Item` und `:Entity:Property`
-  - `:Claim:<Datatype>`-Knoten für Claims ohne Entity-Ziel
-- **`Input.relationships()`** öffnet den Dump ein zweites Mal und liefert nur Kanten:
+- **`Input.nodes()`** opens the dump and delivers nodes only:
+  - `:Entity:Item` and `:Entity:Property`
+  - `:Claim:<Datatype>` nodes for claims without an entity target
+- **`Input.relationships()`** opens the dump a second time and delivers relationships only:
   - Entity → Entity
   - Entity → Claim
-  - `UNIT_TYPE` und `GLOBE_TYPE`
-- **Kein Zwischenpuffer:** Der Importer zieht über `InputIterator.next(InputChunk)` aus mehreren Threads.
-  - Unter einem Lock wird nur ein Chunk roher Zeilen gelesen, z. B. 1.000 Zeilen. Das JSON-Parsing und das Mapping laufen danach ohne Lock im jeweiligen Importer-Thread.
-  - Im Speicher liegen damit höchstens „Anzahl Threads × Chunk“ Zeilen.
-  - Backpressure entsteht von selbst: Es wird nur gelesen, wenn der Importer einen neuen Chunk anfordert. Es gibt keinen Ringpuffer und keinen Spool.
-- **PropertyIndex:** eine Zuordnung Property-Id → Relationship-Typ.
-  - Er wird im ersten Durchlauf als Nebeneffekt gefüllt. Das sind etwa 12.000 Einträge in einer `ConcurrentHashMap`.
-  - Im zweiten Durchlauf ist er vollständig, auch wenn Properties erst spät im Dump stehen.
-- **Claim-Knoten und Claim-Kanten:** Beide Durchläufe erzeugen dieselben Claim-Ids, nämlich die Wikidata-Statement-Ids. Die Kanten finden ihre Claim-Knoten deshalb über die String-Ids des Importers.
-- **Nicht auflösbare Kanten:** `Collectors.badCollector(OutputStream, UNLIMITED_TOLERANCE)` schreibt sie in `--error-log` (Standard `<pfad>.errors.log`). Der Import bricht nicht ab. Kanten auf Entities, die weiter unten in der Datei stehen, werden normal aufgelöst, weil alle Knoten vor der ersten Kante feststehen.
-- **Kosten:** Der Dump wird zweimal gelesen und dekomprimiert. Bei bz2 ist die Dekompression der Engpass. Das ist der Preis dafür, dass es keine Zwischendatei gibt.
+  - `UNIT_TYPE` and `GLOBE_TYPE`
+- **No intermediate buffer:** The importer pulls from multiple threads via `InputIterator.next(InputChunk)`.
+  - Only one chunk of raw lines is read under a lock, e.g. 1,000 lines. JSON parsing and mapping then run without a lock in the respective importer thread.
+  - At most "number of threads × chunk" lines are therefore held in memory.
+  - Backpressure arises by itself: lines are read only when the importer requests a new chunk. There is no ring buffer and no spool.
+- **PropertyIndex:** a mapping of property id → relationship type.
+  - It is filled as a side effect in the first pass. That is about 12,000 entries in a `ConcurrentHashMap`.
+  - In the second pass it is complete, even if properties appear late in the dump.
+- **Claim nodes and claim relationships:** Both passes produce the same claim ids, namely the Wikidata statement ids. The relationships therefore find their claim nodes via the importer's string ids.
+- **Unresolvable relationships:** `Collectors.badCollector(OutputStream, UNLIMITED_TOLERANCE)` writes them to `--error-log` (default `<path>.errors.log`). The import does not abort. Relationships to entities that appear further down in the file are resolved normally, because all nodes are known before the first relationship.
+- **Cost:** The dump is read and decompressed twice. For bz2, decompression is the bottleneck. That is the price for having no intermediate file.
 
-## Paketstruktur (`de.thm.mni.wikidata.neo4j`)
+## Package structure (`de.thm.mni.wikidata.neo4j`)
 ```
 de.thm.mni.wikidata.neo4j
-├── cli        WikidataImportCommand (picocli), Main – Argumente, Exit-Codes
-├── dump       DumpSource (öffnet Datei, Compression AUTO|NONE|GZIP|BZIP2),
-│              LineChunkReader – liest unter Lock n Rohzeilen, strippt [ ] und Kommas
+├── cli        WikidataImportCommand (picocli), Main – arguments, exit codes
+├── dump       DumpSource (opens file, Compression AUTO|NONE|GZIP|BZIP2),
+│              LineChunkReader – reads n raw lines under a lock, strips [ ] and commas
 ├── model      Records: Entity, EntityType, Statement, DataValue (sealed: EntityRef, Quantity,
 │              GlobeCoordinate, Time, Monolingualtext, StringValue, ...)
-├── parse      EntityParser – JSON-Zeile → Entity (Jackson, nur en, nur mainsnak/value)
+├── parse      EntityParser – JSON line → Entity (Jackson, en only, mainsnak/value only)
 ├── mapping    Naming (slugify/relationify/labelify), PropertyIndex (thread-safe),
-│              NodeMapper – Entity → Knoten; RelationshipMapper – Entity + PropertyIndex → Kanten
+│              NodeMapper – Entity → nodes; RelationshipMapper – Entity + PropertyIndex → relationships
 ├── neo4j      WikidataInput (implements Input), NodeInputIterator / RelationshipInputIterator
-│              (je über LineChunkReader), ImporterRunner (BatchImporterFactory, Config, Collector)
+│              (each on top of LineChunkReader), ImporterRunner (BatchImporterFactory, Config, Collector)
 └── WikidataImport   Orchestrator
 ```
-Weitere Dateien: `bin/wikidata-import.sh` und ADRs in `docs/adr/`:
-- 0001: Neo4j 5 mit internem BatchImporter
-- 0002: Graphmodell nach findie
-- 0003: Zwei Durchläufe statt Zwischenpuffer
-- 0004: Nicht auflösbare Relationships ins Error-Log
+Further files: `bin/wikidata-import.sh` and ADRs in `docs/adr/`:
+- 0001: Neo4j 5 with the internal BatchImporter
+- 0002: Graph model after findie
+- 0003: Two passes instead of intermediate buffers
+- 0004: Unresolvable relationships to the error log
 
-## Implementierungsschritte (jeder einzeln testbar)
+## Implementation steps (each individually testable)
 
-1. **Projektgerüst**
-   - Inhalt: Maven-Wrapper, `pom.xml` (Java 21, picocli, neo4j 5.26, jackson-databind, commons-compress, JUnit, AssertJ, shade), leerer `Main`, ADRs.
-   - Test: `./mvnw -q verify` ist grün, ein Smoke-Test lädt `Main`.
+1. **Project skeleton**
+   - Content: Maven wrapper, `pom.xml` (Java 21, picocli, neo4j 5.26, jackson-databind, commons-compress, JUnit, AssertJ, shade), empty `Main`, ADRs.
+   - Test: `./mvnw -q verify` is green, a smoke test loads `Main`.
 
-2. **Spike: Neo4j-Input-Vertrag absichern** (Test-only)
-   - Inhalt: ein minimales `Input` über In-Memory-Listen. Die DB wird zur Prüfung mit `DatabaseManagementServiceBuilder` geöffnet.
-   - Test 1: `nodes()` und `relationships()` werden je genau **einmal** geöffnet, und alle Knoten kommen vor der ersten Kante.
-   - Test 2: Eine Kante auf einen Knoten, der in der Eingabe später steht, wird importiert.
-   - Test 3: Ein fehlendes Ziel landet im Error-Log-Stream.
+2. **Spike: secure the Neo4j input contract** (test only)
+   - Content: a minimal `Input` over in-memory lists. The DB is opened with `DatabaseManagementServiceBuilder` for verification.
+   - Test 1: `nodes()` and `relationships()` are each opened exactly **once**, and all nodes come before the first relationship.
+   - Test 2: A relationship to a node that appears later in the input is imported.
+   - Test 3: A missing target ends up in the error log stream.
 
-3. **CLI-Argumente** (`cli`)
-   - Inhalt: `<json-file>` und `<pfad>`, `--compression=auto|none|gzip|bzip2` (Standard `auto` per Dateiendung), `--error-log`, `--chunk-size`. Validierung: Datei existiert, Ziel fehlt oder ist leer.
-   - Test: `CommandLine.execute(...)` prüft Exit-Codes, Fehlermeldungen und die Optionswerte.
+3. **CLI arguments** (`cli`)
+   - Content: `<json-file>` and `<path>`, `--compression=auto|none|gzip|bzip2` (default `auto` by file extension), `--error-log`, `--chunk-size`. Validation: file exists, target does not exist or is empty.
+   - Test: `CommandLine.execute(...)` checks exit codes, error messages and option values.
 
 4. **DumpSource + LineChunkReader** (`dump`)
-   - Test 1: Das Fixture liefert 99 Records, der erste ist Q31. `.gz` und `.bz2` liefern dasselbe Ergebnis.
-   - Test 2: `auto` erkennt das Format an der Dateiendung, ein explizites Flag überschreibt die Endung.
-   - Test 3: Mehrere Threads lesen Chunks und bekommen jede Zeile genau einmal.
-   - Die Fixtures `.gz` und `.bz2` liegen in `src/test/resources`.
+   - Test 1: The fixture delivers 99 records, the first is Q31. `.gz` and `.bz2` deliver the same result.
+   - Test 2: `auto` detects the format by file extension, an explicit flag overrides the extension.
+   - Test 3: Multiple threads read chunks and each line is received exactly once.
+   - The `.gz` and `.bz2` fixtures are located in `src/test/resources`.
 
 5. **Model + EntityParser** (`model`, `parse`)
-   - Test: Q31 ergibt Label `Belgium`, die Beschreibung, Aliases und eine erwartete Anzahl Statements je Datentyp.
-   - Zusätzlich: ein neues Fixture `mixed.json`, in dem Properties (P31, P1082, P625) **nach** den Items stehen und ein Verweis auf eine nicht enthaltene Q-Id vorkommt.
+   - Test: Q31 yields the label `Belgium`, the description, aliases and an expected number of statements per datatype.
+   - In addition: a new fixture `mixed.json` in which properties (P31, P1082, P625) appear **after** the items and a reference to a Q id that is not contained occurs.
 
 6. **Naming** (`mapping.Naming`)
-   - Test: parametrisierte Fälle wie `instance of` → `INSTANCE_OF`, `globe-coordinate` → `GlobeCoordinate`, `2D` → `_2D`.
+   - Test: parameterized cases such as `instance of` → `INSTANCE_OF`, `globe-coordinate` → `GlobeCoordinate`, `2D` → `_2D`.
 
 7. **NodeMapper + PropertyIndex** (`mapping`)
-   - Test 1: Für Q31 stimmen der Entity-Knoten (Labels und Felder) und die Claim-Knoten (`:Claim:Quantity` …, Id = Statement-Id).
-   - Test 2: Ein Property-Record trägt seinen Typ in den Index ein (`P31` → `INSTANCE_OF`). Unbekannte Ids ergeben `CLAIM`.
+   - Test 1: For Q31 the entity node (labels and fields) and the claim nodes (`:Claim:Quantity` …, id = statement id) are correct.
+   - Test 2: A property record registers its type in the index (`P31` → `INSTANCE_OF`). Unknown ids yield `CLAIM`.
 
 8. **RelationshipMapper** (`mapping`)
-   - Test: Für Q31 entsteht Q31 -[INSTANCE_OF {by:P31, id}]-> Q6256. Die Claim-Kanten zeigen auf dieselben Statement-Ids wie in Schritt 7. `UNIT_TYPE` und `GLOBE_TYPE` werden erzeugt.
+   - Test: For Q31 the relationship Q31 -[INSTANCE_OF {by:P31, id}]-> Q6256 is created. The claim relationships point to the same statement ids as in step 7. `UNIT_TYPE` and `GLOBE_TYPE` are created.
 
 9. **WikidataInput + ImporterRunner** (`neo4j`)
-   - Inhalt: Node- und Relationship-InputIterator auf Basis des LineChunkReaders. `validateAndEstimate` schätzt grob aus der Dateigröße.
-   - Test 1: Import von `mixed.json` in `@TempDir`. `INSTANCE_OF` ist vorhanden, obwohl P31 erst nach den Items steht, und Vorwärtsverweise werden aufgelöst.
-   - Test 2: Der Verweis auf die fehlende Q-Id steht im Error-Log, und der Import läuft durch.
-   - Test 3: Die Datei wurde genau zweimal geöffnet (über eine zählende DumpSource).
+   - Content: node and relationship InputIterator based on the LineChunkReader. `validateAndEstimate` estimates roughly from the file size.
+   - Test 1: Import of `mixed.json` into `@TempDir`. `INSTANCE_OF` is present although P31 appears after the items, and forward references are resolved.
+   - Test 2: The reference to the missing Q id is in the error log, and the import runs through.
+   - Test 3: The file was opened exactly twice (via a counting DumpSource).
 
-10. **Orchestrator + CLI End-to-End**
-    - Test: `wikidata-100.json` und `mixed.json` laufen per CLI in `@TempDir`. Die DB öffnet sich, `count(n) > 0` gilt, und die Labels `Item` und `Claim` sowie mindestens eine `INSTANCE_OF`-Kante sind vorhanden. Das entspricht der Akzeptanz aus SPEC.
+10. **Orchestrator + CLI end to end**
+    - Test: `wikidata-100.json` and `mixed.json` run via CLI into `@TempDir`. The DB opens, `count(n) > 0` holds, and the labels `Item` and `Claim` as well as at least one `INSTANCE_OF` relationship are present. This corresponds to the acceptance criterion in SPEC.
 
-11. **Packaging + Shellscript**
-    - Inhalt: Shade baut `tools.jar`, dazu `bin/wikidata-import.sh <json-file> <pfad> [optionen]`.
-    - Test: ein Failsafe-IT ruft das Script mit dem `.bz2`-Fixture auf und prüft Exit-Code 0 sowie eine nicht leere DB.
+11. **Packaging + shell script**
+    - Content: Shade builds `tools.jar`, plus `bin/wikidata-import.sh <json-file> <path> [options]`.
+    - Test: a Failsafe IT calls the script with the `.bz2` fixture and checks exit code 0 and a non-empty DB.
 
-## Verifikation
-- Nach jedem Schritt laufen der Einzeltest (`./mvnw -q test -Dtest=…`) und danach `./mvnw -q verify`.
-- Zum Schluss wird `bin/wikidata-import.sh` manuell mit dem Fixture ausgeführt und die DB in Neo4j 5.26 geöffnet.
+## Verification
+- After each step the single test (`./mvnw -q test -Dtest=…`) runs, followed by `./mvnw -q verify`.
+- Finally `bin/wikidata-import.sh` is run manually with the fixture and the DB is opened in Neo4j 5.26.

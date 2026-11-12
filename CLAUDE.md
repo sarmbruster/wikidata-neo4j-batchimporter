@@ -1,25 +1,26 @@
-# Projekt
-Siehe @SPEC.md für Anforderungen. Aufruf, Optionen und Graphmodell stehen in @README.md, Entscheidungen in `docs/adr/`.
+# Project
+See @SPEC.md for requirements. Invocation, options and graph model are described in @README.md, decisions in `docs/adr/`.
 
-## Befehle
-- Build+Tests (inkl. Integrationstests `*IT`, die das gebaute `target/tools.jar` brauchen): `./mvnw -q verify`
-- Einzeltest: `./mvnw -q test -Dtest=NodeMapperTest`
-- `*IT`-Tests laufen nur mit `verify`, nicht mit `test`
+## Commands
+- Build and tests (including the integration tests `*IT`, which need the built `target/tools.jar`): `./mvnw -q verify`
+- Single test: `./mvnw -q test -Dtest=NodeMapperTest`
+- `*IT` tests run only with `verify`, not with `test`
 
-## Architektur
-- Der Neo4j-BatchImporter (interne API, Version in `pom.xml` fest gepinnt, 5.26.x) verarbeitet erst alle Knoten, dann alle Kanten. Deshalb liest das Tool den Dump zweimal (ADR 0003): Pass 1 liefert Knoten und füllt den `PropertyIndex` (Property-Id → Kantentyp), Pass 2 liefert Kanten mit dem vollständigen Index.
-- Keine Zwischenpuffer oder Spool-Dateien einbauen: Ein Puffer für Kanten blockiert den Leser während der Knotenphase. Der Importer zieht Chunks aus mehreren Threads (`LineChunkReader` liest unter Lock, Parsing und Mapping laufen danach parallel).
-- Datenfluss: `dump` (Zeilen) → `parse` (Entity) → `mapping` (`NodeMapper`, `RelationshipMapper`) → `neo4j` (`WikidataInput`, `ImporterRunner`). `WikidataImport` verbindet alles, `cli` ist nur picocli.
-- `<pfad>` ist das Neo4j-Home, nicht das Datenbankverzeichnis (ADR 0005): Die Datenbank liegt unter `<pfad>/data/databases/neo4j`.
-- Kanten auf Entities, die im Dump fehlen, landen im Error-Log und brechen den Import nicht ab (ADR 0004).
+## Architecture
+- The Neo4j batch importer (internal API, version pinned in `pom.xml`, 5.26.x) processes all nodes first, then all relationships. The tool therefore reads the dump twice (ADR 0003): pass 1 delivers nodes and fills the `PropertyIndex` (property id → relationship type), pass 2 delivers relationships with the complete index.
+- Do not add intermediate buffers or spool files: a buffer for relationships blocks the reader during the node phase. The importer pulls chunks from multiple threads (`LineChunkReader` reads under a lock, parsing and mapping then run in parallel).
+- Data flow: `dump` (lines) → `parse` (entity) → `mapping` (`NodeMapper`, `RelationshipMapper`) → `neo4j` (`WikidataInput`, `ImporterRunner`). `WikidataImport` connects everything, `cli` is only picocli.
+- `<path>` is the Neo4j home, not the database directory (ADR 0005): the database is located in `<path>/data/databases/neo4j`.
+- Relationships to entities that are missing in the dump end up in the error log and do not abort the import (ADR 0004).
 
 ## Tests
-- `Fixtures` und `Neo4jHome` (Testklassen) laden Fixtures bzw. öffnen die erzeugte Datenbank und zählen mit Cypher.
-- `wikidata-100.json` ist 20 MB groß (nur Items): gz und bz2 werden zur Laufzeit im Test erzeugt, nicht eingecheckt.
-- `mixed.json` ist das kleine Fixture (Properties nach den Items, Vorwärtsverweis, Verweis auf fehlende `Q404404`) für Mapping- und Importtests.
+- `Fixtures` and `Neo4jHome` (test classes) load fixtures and open the created database and count with Cypher, respectively.
+- `wikidata-100.json` is 20 MB (items only): gz and bz2 variants are created at runtime in the test and are not checked in.
+- `mixed.json` is the small fixture (properties after the items, forward reference, reference to the missing `Q404404`) for mapping and import tests.
 
-## Regeln
-- Nach jeder Änderung `./mvnw -q verify` ausführen, erst bei grün fertig melden
-- Keine neuen Dependencies ohne Rückfrage
-- Records statt Lombok, keine Field-Injection
-- Tests mit AssertJ, Fixtures aus src/test/resources
+## Rules
+- English is the project language: code, documentation, ADRs and commit messages
+- Run `./mvnw -q verify` after every change, report done only when green
+- No new dependencies without asking
+- Records instead of Lombok, no field injection
+- Tests with AssertJ, fixtures from src/test/resources

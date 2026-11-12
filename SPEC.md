@@ -1,13 +1,13 @@
 # SPEC
-## Ziel
-CLI-Tool: liest wikidata json file und nutzt den Neo4j batch importer auf Java-Ebene um eine Neo4j Datenbank zu erzeugen.
+## Goal
+CLI tool: reads a Wikidata JSON file and uses the Neo4j batch importer on the Java level to create a Neo4j database.
 ## Stack
 Java 21, Maven, picocli, Neo4j, JUnit, AssertJ
-## Formatdetails
-JSON Array, jeder Record ist auf einer eigener Zeile, details https://doc.wikimedia.org/Wikibase/master/php/docs_topics_json.html
-## Nicht-Ziele
-Kein GUI
-## Aufruf
-Shellscript, das intern `java -jar tools.jar <json-file> <pfad>` aufruft.
-## Akzeptanz
-Der Batchimporter bricht nicht ab, das erzeugte Verzeichnis ist eine valide Neo4j Datenbank, die nicht leer ist.
+## Format details
+JSON array, each record is on its own line, details https://doc.wikimedia.org/Wikibase/master/php/docs_topics_json.html
+## Non-goals
+No GUI
+## Invocation
+Shell script that internally calls `java -jar tools.jar <json-file> <path>`.
+## Acceptance
+The batch importer does not abort, the created directory is a valid Neo4j database that is not empty.
