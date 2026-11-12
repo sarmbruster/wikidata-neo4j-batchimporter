@@ -1,8 +1,6 @@
 package de.thm.mni.wikidata.neo4j.neo4j;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.neo4j.kernel.impl.scheduler.JobSchedulerFactory.createInitialisedScheduler;
-import static org.neo4j.storageengine.api.TransactionIdStore.BASE_TX_ID;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -15,42 +13,19 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.neo4j.batchimport.api.AdditionalInitialIds;
-import org.neo4j.batchimport.api.Configuration;
 import org.neo4j.batchimport.api.InputIterable;
 import org.neo4j.batchimport.api.InputIterator;
-import org.neo4j.batchimport.api.Monitor;
 import org.neo4j.batchimport.api.input.Collector;
 import org.neo4j.batchimport.api.input.Group;
 import org.neo4j.batchimport.api.input.IdType;
 import org.neo4j.batchimport.api.input.Input;
 import org.neo4j.batchimport.api.input.InputChunk;
 import org.neo4j.batchimport.api.input.InputEntityVisitor;
-import org.neo4j.configuration.Config;
-import org.neo4j.configuration.GraphDatabaseSettings;
-import org.neo4j.dbms.api.DatabaseManagementService;
-import org.neo4j.dbms.api.DatabaseManagementServiceBuilder;
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.internal.batchimport.DefaultAdditionalIds;
 import org.neo4j.internal.batchimport.input.BadCollector;
 import org.neo4j.internal.batchimport.input.Collectors;
 import org.neo4j.internal.batchimport.input.Groups;
-import org.neo4j.io.fs.DefaultFileSystemAbstraction;
-import org.neo4j.io.layout.DatabaseLayout;
-import org.neo4j.io.layout.Neo4jLayout;
-import org.neo4j.io.pagecache.context.CursorContextFactory;
-import org.neo4j.io.pagecache.context.FixedVersionContextSupplier;
-import org.neo4j.io.pagecache.tracing.PageCacheTracer;
-import org.neo4j.kernel.impl.index.schema.IndexImporterFactoryImpl;
-import org.neo4j.kernel.impl.transaction.log.files.TransactionLogInitializer;
-import org.neo4j.logging.NullLogProvider;
-import org.neo4j.logging.internal.SimpleLogService;
-import org.neo4j.memory.EmptyMemoryTracker;
-import org.neo4j.storageengine.api.StorageEngineFactory;
 
 class ImporterContractTest {
-
-    private static final String DATABASE = GraphDatabaseSettings.DEFAULT_DATABASE_NAME;
 
     @TempDir
     Path home;
@@ -97,44 +72,11 @@ class ImporterContractTest {
     }
 
     private void runImport(Input input, Collector collector) throws IOException {
-        Config config = Config.newBuilder()
-                .set(GraphDatabaseSettings.neo4j_home, home)
-                .build();
-        DatabaseLayout layout = Neo4jLayout.of(config).databaseLayout(DATABASE);
-        try (var scheduler = createInitialisedScheduler();
-                var fileSystem = new DefaultFileSystemAbstraction()) {
-            var importer = StorageEngineFactory.selectStorageEngine(config)
-                    .batchImporter(
-                            layout,
-                            fileSystem,
-                            PageCacheTracer.NULL,
-                            Configuration.DEFAULT,
-                            new SimpleLogService(NullLogProvider.getInstance()),
-                            null,
-                            false,
-                            DefaultAdditionalIds.EMPTY,
-                            config,
-                            new Monitor() {},
-                            scheduler,
-                            collector,
-                            TransactionLogInitializer.getLogFilesInitializer(),
-                            new IndexImporterFactoryImpl(),
-                            EmptyMemoryTracker.INSTANCE,
-                            new CursorContextFactory(PageCacheTracer.NULL, new FixedVersionContextSupplier(BASE_TX_ID)));
-            importer.doImport(input);
-        }
+        ImporterRunner.run(input, home, collector, null);
     }
 
     private long countRelationships() {
-        DatabaseManagementService dbms = new DatabaseManagementServiceBuilder(home).build();
-        try {
-            GraphDatabaseService db = dbms.database(DATABASE);
-            try (var tx = db.beginTx()) {
-                return tx.execute("MATCH ()-[r]->() RETURN count(r) AS c").<Long>columnAs("c").next();
-            }
-        } finally {
-            dbms.shutdown();
-        }
+        return Neo4jHome.count(home, "MATCH ()-[r]->() RETURN count(r) AS c");
     }
 
     record Edge(String from, String to) {}

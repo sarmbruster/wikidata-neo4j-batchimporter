@@ -22,6 +22,14 @@ public class DumpSource {
         this.compression = compression.resolve(file);
     }
 
+    public Path file() {
+        return file;
+    }
+
+    public Compression compression() {
+        return compression;
+    }
+
     public LineChunkReader open() throws IOException {
         InputStream raw = Files.newInputStream(file);
         try {
