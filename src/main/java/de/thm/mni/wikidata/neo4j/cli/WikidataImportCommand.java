@@ -65,10 +65,17 @@ public class WikidataImportCommand implements Callable<Integer> {
         return new CommandLine(new WikidataImportCommand(importer)).setCaseInsensitiveEnumValuesAllowed(true);
     }
 
+    @Option(
+            names = "--progress",
+            description = "Show a progress bar with the estimated remaining time on stderr instead of the "
+                    + "neo4j progress output. The estimate covers reading the dump, the final steps inside neo4j "
+                    + "come on top.")
+    boolean progress;
+
     @Override
     public Integer call() throws IOException {
         validate();
-        var request = new ImportRequest(jsonFile, compression, target, errorLog(), chunkSize);
+        var request = new ImportRequest(jsonFile, compression, target, errorLog(), chunkSize, progress);
         try {
             ImportResult result = importer.run(request);
             report(result);
@@ -101,6 +108,10 @@ public class WikidataImportCommand implements Callable<Integer> {
 
     public Path errorLog() {
         return errorLog != null ? errorLog : target.resolveSibling(target.getFileName() + ".errors.log");
+    }
+
+    public boolean progress() {
+        return progress;
     }
 
     public int chunkSize() {

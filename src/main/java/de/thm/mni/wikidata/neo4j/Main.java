@@ -8,6 +8,6 @@ public final class Main {
     }
 
     public static void main(String[] args) {
-        System.exit(WikidataImportCommand.commandLine(new WikidataImport(System.out)).execute(args));
+        System.exit(WikidataImportCommand.commandLine(new WikidataImport(System.out, System.err, System.console() != null)).execute(args));
     }
 }

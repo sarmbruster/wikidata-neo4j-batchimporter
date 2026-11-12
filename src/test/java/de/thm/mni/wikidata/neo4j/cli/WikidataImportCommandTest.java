@@ -84,7 +84,22 @@ class WikidataImportCommandTest {
         execute(dump, target, "--compression=gzip", "--chunk-size=7");
 
         assertThat(requests).containsExactly(
-                new ImportRequest(dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7));
+                new ImportRequest(dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7, false));
+    }
+
+    @Test
+    void enablesProgressBarWithFlag() {
+        execute(dump, tmp.resolve("db"), "--progress");
+
+        assertThat(command.progress()).isTrue();
+        assertThat(requests.getFirst().progress()).isTrue();
+    }
+
+    @Test
+    void progressBarIsOffByDefault() {
+        execute(dump, tmp.resolve("db"));
+
+        assertThat(command.progress()).isFalse();
     }
 
     @Test

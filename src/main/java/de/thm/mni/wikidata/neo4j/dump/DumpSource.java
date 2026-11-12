@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.LongConsumer;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 
@@ -16,10 +17,16 @@ public class DumpSource {
 
     private final Path file;
     private final Compression compression;
+    private final LongConsumer onBytesRead;
 
     public DumpSource(Path file, Compression compression) {
+        this(file, compression, bytes -> {});
+    }
+
+    public DumpSource(Path file, Compression compression, LongConsumer onBytesRead) {
         this.file = file;
         this.compression = compression.resolve(file);
+        this.onBytesRead = onBytesRead;
     }
 
     public Path file() {
@@ -31,7 +38,7 @@ public class DumpSource {
     }
 
     public LineChunkReader open() throws IOException {
-        InputStream raw = Files.newInputStream(file);
+        InputStream raw = new CountingInputStream(Files.newInputStream(file), onBytesRead);
         try {
             InputStream decompressed = decompress(raw);
             return new LineChunkReader(
