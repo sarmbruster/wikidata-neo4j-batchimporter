@@ -61,7 +61,7 @@ final class DumpInputIterable<R> implements InputIterable {
 
         @Override
         public boolean next(InputChunk chunk) throws IOException {
-            List<String> lines = reader.readChunk(chunkSize);
+            List<byte[]> lines = reader.readChunk(chunkSize);
             if (lines.isEmpty()) {
                 return false;
             }
@@ -77,11 +77,11 @@ final class DumpInputIterable<R> implements InputIterable {
 
     private final class DumpChunk implements InputChunk {
 
-        private List<String> lines = List.of();
+        private List<byte[]> lines = List.of();
         private int nextLine;
         private final Queue<R> pending = new ArrayDeque<>();
 
-        void load(List<String> lines) {
+        void load(List<byte[]> lines) {
             this.lines = lines;
             this.nextLine = 0;
             this.pending.clear();

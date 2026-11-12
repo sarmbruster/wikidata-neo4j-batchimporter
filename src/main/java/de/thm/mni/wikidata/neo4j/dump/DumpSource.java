@@ -1,11 +1,8 @@
 package de.thm.mni.wikidata.neo4j.dump;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.function.LongConsumer;
@@ -41,9 +38,7 @@ public class DumpSource {
     public LineChunkReader open() throws IOException {
         InputStream raw = new CountingInputStream(Files.newInputStream(file), onBytesRead);
         try {
-            InputStream decompressed = decompress(raw);
-            return new LineChunkReader(
-                    new BufferedReader(new InputStreamReader(decompressed, StandardCharsets.UTF_8), BUFFER_SIZE));
+            return new LineChunkReader(decompress(raw));
         } catch (IOException | RuntimeException e) {
             raw.close();
             throw e;

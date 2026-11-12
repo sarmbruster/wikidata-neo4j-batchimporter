@@ -11,6 +11,7 @@ import de.thm.mni.wikidata.neo4j.model.EntityType;
 import de.thm.mni.wikidata.neo4j.model.Statement;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -25,11 +26,16 @@ public final class EntityParser {
     private final JsonFactory factory = new JsonFactory();
 
     public Optional<Entity> parse(String json) {
+        return parse(json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public Optional<Entity> parse(byte[] json) {
         try (JsonParser parser = factory.createParser(json)) {
             return parseEntity(parser);
         } catch (IOException e) {
-            String context = json.length() > MAX_ERROR_CONTEXT ? json.substring(0, MAX_ERROR_CONTEXT) + "..." : json;
-            throw new UncheckedIOException("Invalid entity JSON: " + context, e);
+            String context = new String(json, 0, Math.min(json.length, MAX_ERROR_CONTEXT), StandardCharsets.UTF_8);
+            throw new UncheckedIOException(
+                    "Invalid entity JSON: " + context + (json.length > MAX_ERROR_CONTEXT ? "..." : ""), e);
         }
     }
 

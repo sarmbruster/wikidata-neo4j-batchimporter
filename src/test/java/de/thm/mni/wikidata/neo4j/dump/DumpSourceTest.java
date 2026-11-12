@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -121,9 +122,9 @@ class DumpSourceTest {
             List<Future<?>> futures = new ArrayList<>();
             for (int i = 0; i < 4; i++) {
                 futures.add(executor.submit(() -> {
-                    List<String> chunk;
+                    List<byte[]> chunk;
                     while (!(chunk = reader.readChunk(7)).isEmpty()) {
-                        received.addAll(chunk);
+                        chunk.forEach(record -> received.add(new String(record, StandardCharsets.UTF_8)));
                     }
                     return null;
                 }));
@@ -149,9 +150,9 @@ class DumpSourceTest {
     private static List<String> readAll(DumpSource source, int chunkSize) throws IOException {
         List<String> records = new ArrayList<>();
         try (var reader = source.open()) {
-            List<String> chunk;
+            List<byte[]> chunk;
             while (!(chunk = reader.readChunk(chunkSize)).isEmpty()) {
-                records.addAll(chunk);
+                chunk.forEach(record -> records.add(new String(record, StandardCharsets.UTF_8)));
             }
         }
         return records;

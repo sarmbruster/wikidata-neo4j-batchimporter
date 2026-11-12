@@ -7,6 +7,7 @@ import de.thm.mni.wikidata.neo4j.parse.EntityParser;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,9 +33,9 @@ public final class Fixtures {
     public static List<String> records(String resource, int max) {
         List<String> records = new ArrayList<>();
         try (var reader = new DumpSource(path(resource), Compression.AUTO).open()) {
-            List<String> chunk;
+            List<byte[]> chunk;
             while (records.size() < max && !(chunk = reader.readChunk(100)).isEmpty()) {
-                records.addAll(chunk);
+                chunk.forEach(record -> records.add(new String(record, StandardCharsets.UTF_8)));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
