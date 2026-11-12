@@ -1,5 +1,6 @@
 package de.thm.mni.wikidata.neo4j.dump;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,7 +53,7 @@ public class DumpSource {
     private InputStream decompress(InputStream raw) throws IOException {
         return switch (compression) {
             case GZIP -> new GZIPInputStream(raw, BUFFER_SIZE);
-            case BZIP2 -> new BZip2CompressorInputStream(raw, true);
+            case BZIP2 -> new BZip2CompressorInputStream(new BufferedInputStream(raw, BUFFER_SIZE), true);
             case NONE, AUTO -> raw;
         };
     }

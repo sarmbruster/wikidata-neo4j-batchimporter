@@ -76,6 +76,19 @@ class DumpSourceTest {
     }
 
     @Test
+    void readsTheRawFileInLargeBlocksForEveryCompression() throws Exception {
+        Path gz = compress("wikidata.json.gz", GZIPOutputStream::new);
+        Path bz2 = compress("wikidata.json.bz2", BZip2CompressorOutputStream::new);
+
+        for (Path file : List.of(plain, gz, bz2)) {
+            var reads = new java.util.concurrent.atomic.AtomicLong();
+            readAll(new DumpSource(file, Compression.AUTO, bytes -> reads.incrementAndGet()), 1000);
+
+            assertThat(reads.get()).as(file.getFileName().toString()).isLessThan(Files.size(file) / 1024);
+        }
+    }
+
+    @Test
     void resolvesCompressionByFileExtension() {
         assertThat(Compression.AUTO.resolve(Path.of("a.json"))).isEqualTo(Compression.NONE);
         assertThat(Compression.AUTO.resolve(Path.of("a.json.gz"))).isEqualTo(Compression.GZIP);
