@@ -38,6 +38,17 @@ JAVA_OPTS="-Xmx8g" bin/wikidata-import.sh latest-all.json.bz2 /data/neo4j-home -
 
 Exit codes: `0` success, `1` import failed, `2` invalid arguments.
 
+## Release
+
+Push a tag `vX.Y.Z` (or `vX.Y.Z-rc1` for a pre-release) to publish a GitHub release:
+
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow runs the tests and attaches a ZIP with `tools.jar`, `wikidata-import.sh` and a SHA-256 file. See [docs/releasing.md](docs/releasing.md) for the full process.
+
 ## Graph model
 
 | Source | Result |
