@@ -1,11 +1,16 @@
 package de.thm.mni.wikidata.neo4j.cli;
 
+import de.thm.mni.wikidata.neo4j.ImportRequest;
+import de.thm.mni.wikidata.neo4j.ImportResult;
+import de.thm.mni.wikidata.neo4j.Importer;
 import de.thm.mni.wikidata.neo4j.dump.Compression;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
+import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -20,6 +25,8 @@ import picocli.CommandLine.Spec;
 public class WikidataImportCommand implements Callable<Integer> {
 
     static final int DEFAULT_CHUNK_SIZE = 1000;
+
+    private final Importer importer;
 
     @Spec
     CommandSpec spec;
@@ -50,10 +57,34 @@ public class WikidataImportCommand implements Callable<Integer> {
             description = "Number of dump lines read per chunk. Default: ${DEFAULT-VALUE}.")
     int chunkSize;
 
+    public WikidataImportCommand(Importer importer) {
+        this.importer = importer;
+    }
+
+    public static CommandLine commandLine(Importer importer) {
+        return new CommandLine(new WikidataImportCommand(importer)).setCaseInsensitiveEnumValuesAllowed(true);
+    }
+
     @Override
     public Integer call() throws IOException {
         validate();
-        return 0;
+        var request = new ImportRequest(jsonFile, compression, target, errorLog(), chunkSize);
+        try {
+            ImportResult result = importer.run(request);
+            report(result);
+            return 0;
+        } catch (IOException | UncheckedIOException e) {
+            spec.commandLine().getErr().println("Import failed: " + e.getMessage());
+            return 1;
+        }
+    }
+
+    private void report(ImportResult result) {
+        var out = spec.commandLine().getOut();
+        out.println("Neo4j database created in " + target + " (database 'neo4j').");
+        if (result.unresolvedRelationships() > 0) {
+            out.println(result.unresolvedRelationships() + " relationships could not be resolved, see " + errorLog());
+        }
     }
 
     public Path jsonFile() {

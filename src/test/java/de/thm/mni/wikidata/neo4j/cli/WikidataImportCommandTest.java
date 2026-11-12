@@ -2,11 +2,15 @@ package de.thm.mni.wikidata.neo4j.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.thm.mni.wikidata.neo4j.ImportRequest;
+import de.thm.mni.wikidata.neo4j.ImportResult;
 import de.thm.mni.wikidata.neo4j.dump.Compression;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,13 +25,20 @@ class WikidataImportCommandTest {
     private WikidataImportCommand command;
     private CommandLine commandLine;
     private StringWriter err;
+    private StringWriter out;
+    private List<ImportRequest> requests;
 
     @BeforeEach
     void setUp() throws Exception {
         dump = Path.of(getClass().getResource("/wikidata-100.json").toURI());
-        command = new WikidataImportCommand();
+        requests = new ArrayList<>();
+        command = new WikidataImportCommand(request -> {
+            requests.add(request);
+            return new ImportResult(0);
+        });
         err = new StringWriter();
-        commandLine = new CommandLine(command).setErr(new PrintWriter(err));
+        out = new StringWriter();
+        commandLine = new CommandLine(command).setErr(new PrintWriter(err)).setOut(new PrintWriter(out));
         commandLine.setCaseInsensitiveEnumValuesAllowed(true);
     }
 
@@ -64,6 +75,47 @@ class WikidataImportCommandTest {
         assertThat(command.compression()).isEqualTo(Compression.BZIP2);
         assertThat(command.errorLog()).isEqualTo(errorLog);
         assertThat(command.chunkSize()).isEqualTo(50);
+    }
+
+    @Test
+    void passesTheParsedOptionsToTheImporter() {
+        Path target = tmp.resolve("db");
+
+        execute(dump, target, "--compression=gzip", "--chunk-size=7");
+
+        assertThat(requests).containsExactly(
+                new ImportRequest(dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7));
+    }
+
+    @Test
+    void doesNotRunTheImporterForInvalidArguments() {
+        execute(tmp.resolve("missing.json"), tmp.resolve("db"));
+
+        assertThat(requests).isEmpty();
+    }
+
+    @Test
+    void reportsUnresolvedRelationships() {
+        var failing = new CommandLine(new WikidataImportCommand(request -> new ImportResult(3)))
+                .setOut(new PrintWriter(out));
+
+        int exitCode = failing.execute(dump.toString(), tmp.resolve("db").toString());
+
+        assertThat(exitCode).isZero();
+        assertThat(out.toString()).contains("3 relationships could not be resolved").contains("db.errors.log");
+    }
+
+    @Test
+    void returnsExitCodeOneWhenTheImportFails() {
+        var failing = new CommandLine(new WikidataImportCommand(request -> {
+                    throw new java.io.IOException("disk full");
+                }))
+                .setErr(new PrintWriter(err));
+
+        int exitCode = failing.execute(dump.toString(), tmp.resolve("db").toString());
+
+        assertThat(exitCode).isEqualTo(1);
+        assertThat(err.toString()).contains("Import failed: disk full");
     }
 
     @Test
