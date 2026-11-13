@@ -84,7 +84,26 @@ class WikidataImportCommandTest {
         execute(dump, target, "--compression=gzip", "--chunk-size=7");
 
         assertThat(requests).containsExactly(
-                new ImportRequest(dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7, false));
+                new ImportRequest(dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7, false, null));
+    }
+
+    @Test
+    void passesTheLogFileToTheImporterAndReportsIt() {
+        Path logFile = tmp.resolve("import.log");
+
+        execute(dump, tmp.resolve("db"), "--log-file=" + logFile);
+
+        assertThat(command.logFile()).isEqualTo(logFile);
+        assertThat(requests.getFirst().logFile()).isEqualTo(logFile);
+        assertThat(out.toString()).contains("Log written to " + logFile);
+    }
+
+    @Test
+    void writesNoLogFileByDefault() {
+        execute(dump, tmp.resolve("db"));
+
+        assertThat(requests.getFirst().logFile()).isNull();
+        assertThat(out.toString()).doesNotContain("Log written");
     }
 
     @Test

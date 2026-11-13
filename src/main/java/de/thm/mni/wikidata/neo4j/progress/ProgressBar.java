@@ -91,7 +91,7 @@ public final class ProgressBar implements AutoCloseable {
         return format(Duration.ofMillis(remainingMillis));
     }
 
-    static String format(Duration duration) {
+    public static String format(Duration duration) {
         long seconds = duration.toSeconds();
         long hours = seconds / 3600;
         long minutes = seconds % 3600 / 60;

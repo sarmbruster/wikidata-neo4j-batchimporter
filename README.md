@@ -34,6 +34,7 @@ JAVA_OPTS="-Xmx8g" bin/wikidata-import.sh latest-all.json.bz2 /data/neo4j-home -
 | `--compression=auto\|none\|gzip\|bzip2` | `auto` | `auto` decides by file extension (`.gz`, `.bz2`). |
 | `--error-log=<file>` | `<path>.errors.log` | Receives relationships that cannot be resolved. |
 | `--chunk-size=<lines>` | `1000` | Dump lines read per chunk by each importer thread. |
+| `--log-file=<file>` | none | Log with UTC timestamps: start and end of the import, the Neo4j import stages with estimates, durations and peak memory, Neo4j's internal messages and the stack trace of a failure. |
 | `--progress` | off | Progress bar with elapsed time and ETA on stderr. Replaces the Neo4j progress output. |
 
 Exit codes: `0` success, `1` import failed, `2` invalid arguments.

@@ -20,6 +20,7 @@ import org.neo4j.io.pagecache.context.FixedVersionContextSupplier;
 import org.neo4j.io.pagecache.tracing.PageCacheTracer;
 import org.neo4j.kernel.impl.index.schema.IndexImporterFactoryImpl;
 import org.neo4j.kernel.impl.transaction.log.files.TransactionLogInitializer;
+import org.neo4j.logging.InternalLogProvider;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.logging.internal.SimpleLogService;
 import org.neo4j.memory.EmptyMemoryTracker;
@@ -34,6 +35,12 @@ public final class ImporterRunner {
 
     public static void run(Input input, Path neo4jHome, Collector collector, PrintStream progress)
             throws IOException {
+        run(input, neo4jHome, collector, progress, NullLogProvider.getInstance());
+    }
+
+    public static void run(
+            Input input, Path neo4jHome, Collector collector, PrintStream progress, InternalLogProvider logProvider)
+            throws IOException {
         Config config = Config.newBuilder()
                 .set(GraphDatabaseSettings.neo4j_home, neo4jHome.toAbsolutePath())
                 .build();
@@ -46,7 +53,7 @@ public final class ImporterRunner {
                             fileSystem,
                             PageCacheTracer.NULL,
                             Configuration.DEFAULT,
-                            new SimpleLogService(NullLogProvider.getInstance()),
+                            new SimpleLogService(logProvider),
                             progress,
                             false,
                             DefaultAdditionalIds.EMPTY,

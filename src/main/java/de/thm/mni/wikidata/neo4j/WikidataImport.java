@@ -36,19 +36,37 @@ public final class WikidataImport implements Importer {
         var tracker = new ProgressTracker(2 * Files.size(request.jsonFile()));
         var source = new DumpSource(request.jsonFile(), request.compression(), tracker::add);
         var input = new WikidataInput(source, request.chunkSize());
-        try (OutputStream errorLog = Files.newOutputStream(request.errorLog());
+        try (var log = ImportLog.open(request.logFile());
+                OutputStream errorLog = Files.newOutputStream(request.errorLog());
                 var collector = Collectors.badCollector(errorLog, BadCollector.UNLIMITED_TOLERANCE)) {
-            if (request.progress()) {
-                try (var bar = new ProgressBar(
-                                tracker, barOutput, interactive, interactive ? INTERACTIVE_INTERVAL : LOG_INTERVAL)
-                        .start()) {
-                    ImporterRunner.run(input, request.neo4jHome(), collector, null);
+            log.info("Importing " + request.jsonFile() + " (" + source.compression() + ", "
+                    + Files.size(request.jsonFile()) + " bytes) into " + request.neo4jHome());
+            log.info("Chunk size " + request.chunkSize() + ", error log " + request.errorLog());
+            long start = System.nanoTime();
+            try {
+                if (request.progress()) {
+                    try (var bar = new ProgressBar(
+                                    tracker, barOutput, interactive, interactive ? INTERACTIVE_INTERVAL : LOG_INTERVAL)
+                            .start()) {
+                        ImporterRunner.run(input, request.neo4jHome(), collector, log.tee(null), log.neo4jLogProvider());
+                    }
+                } else {
+                    ImporterRunner.run(
+                            input, request.neo4jHome(), collector, log.tee(neo4jOutput), log.neo4jLogProvider());
                 }
-            } else {
-                ImporterRunner.run(input, request.neo4jHome(), collector, neo4jOutput);
+            } catch (IOException | RuntimeException e) {
+                log.error("Import failed after " + elapsedSince(start), e);
+                throw e;
             }
-            return new ImportResult(collector.badEntries());
+            var result = new ImportResult(collector.badEntries());
+            log.info("Import finished in " + elapsedSince(start) + ", " + result.unresolvedRelationships()
+                    + " relationships could not be resolved");
+            return result;
         }
+    }
+
+    private static String elapsedSince(long startNanos) {
+        return ProgressBar.format(Duration.ofNanos(System.nanoTime() - startNanos));
     }
 
     private static void createParentDirectories(Path file) throws IOException {

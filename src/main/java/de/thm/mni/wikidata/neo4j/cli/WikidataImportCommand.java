@@ -72,10 +72,17 @@ public class WikidataImportCommand implements Callable<Integer> {
                     + "come on top.")
     boolean progress;
 
+    @Option(
+            names = "--log-file",
+            paramLabel = "<file>",
+            description = "Write a log with timestamps, the neo4j import stages and neo4j's internal messages to this "
+                    + "file. Default: no log file.")
+    Path logFile;
+
     @Override
     public Integer call() throws IOException {
         validate();
-        var request = new ImportRequest(jsonFile, compression, target, errorLog(), chunkSize, progress);
+        var request = new ImportRequest(jsonFile, compression, target, errorLog(), chunkSize, progress, logFile);
         try {
             ImportResult result = importer.run(request);
             report(result);
@@ -91,6 +98,9 @@ public class WikidataImportCommand implements Callable<Integer> {
         out.println("Neo4j database created in " + target + " (database 'neo4j').");
         if (result.unresolvedRelationships() > 0) {
             out.println(result.unresolvedRelationships() + " relationships could not be resolved, see " + errorLog());
+        }
+        if (logFile != null) {
+            out.println("Log written to " + logFile);
         }
     }
 
@@ -108,6 +118,10 @@ public class WikidataImportCommand implements Callable<Integer> {
 
     public Path errorLog() {
         return errorLog != null ? errorLog : target.resolveSibling(target.getFileName() + ".errors.log");
+    }
+
+    public Path logFile() {
+        return logFile;
     }
 
     public boolean progress() {

@@ -27,7 +27,10 @@ class WikidataImportScriptIT {
         }
         Path home = tmp.resolve("db");
 
-        Process process = new ProcessBuilder(SCRIPT.toString(), dump.toString(), home.toString())
+        Path logFile = tmp.resolve("import.log");
+
+        Process process = new ProcessBuilder(
+                        SCRIPT.toString(), dump.toString(), home.toString(), "--log-file=" + logFile)
                 .redirectErrorStream(true)
                 .start();
         String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -38,6 +41,10 @@ class WikidataImportScriptIT {
         assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(19);
         assertThat(Neo4jHome.count(home, "MATCH ()-[r:INSTANCE_OF]->() RETURN count(r) AS c")).isEqualTo(1);
         assertThat(tmp.resolve("db.errors.log")).exists();
+        assertThat(Files.readString(logFile))
+                .contains("INFO  [o.n.i.b.ImportLogic] Import starting")
+                .contains("IMPORT DONE")
+                .doesNotContain("%d %-5p");
     }
 
     @Test
