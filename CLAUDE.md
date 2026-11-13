@@ -12,6 +12,7 @@ See @SPEC.md for requirements. Invocation, options and graph model are described
 - Data flow: `dump` (lines) → `parse` (entity) → `mapping` (`NodeMapper`, `RelationshipMapper`) → `neo4j` (`WikidataInput`, `ImporterRunner`). `WikidataImport` connects everything, `cli` is only picocli.
 - `<path>` is the Neo4j home, not the database directory (ADR 0005): the database is located in `<path>/data/databases/neo4j`.
 - Relationships to entities that are missing in the dump end up in the error log and do not abort the import (ADR 0004).
+- Progress (ADR 0007): `ImporterRunner` injects `StageProgressMonitor` (an `ExecutionMonitor`) next to Neo4j's own report; `ProgressTracker` measures the two dump passes in bytes and the later phases from the stage events.
 - Input ids are `IdType.INTEGER` (ADR 0006): the mappers use string keys (`Q42`, `P31`, claim nodes `Q42#7` = entity + statement position), `InputIds` encodes them into 56 bits, `ReadableIdCollector` decodes them for the error log.
 
 ## Tests

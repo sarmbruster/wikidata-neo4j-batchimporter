@@ -33,48 +33,45 @@ class ProgressBarTest {
     }
 
     @Test
-    void givesNoEstimateBeforeThereIsEnoughData() {
+    void givesNoEstimateBeforeThereIsEnoughDataOrWhenThePhaseIsComplete() {
         assertThat(ProgressBar.eta(0.0, Duration.ofMinutes(5))).isEqualTo("--");
         assertThat(ProgressBar.eta(0.3, Duration.ofSeconds(1))).isEqualTo("--");
+        assertThat(ProgressBar.eta(1.0, Duration.ofMinutes(5))).isEqualTo("--");
     }
 
     @Test
-    void namesThePhaseByFraction() {
-        assertThat(ProgressBar.phase(0.0)).isEqualTo("Nodes");
-        assertThat(ProgressBar.phase(0.49)).isEqualTo("Nodes");
-        assertThat(ProgressBar.phase(0.5)).isEqualTo("Relationships");
-        assertThat(ProgressBar.phase(0.99)).isEqualTo("Relationships");
-        assertThat(ProgressBar.phase(1.0)).isEqualTo("Finishing");
+    void namesThePhaseAndTheRunningNeo4jStage() {
+        assertThat(ProgressBar.describe(snapshot(ImportPhase.NODES, "", 0.1)))
+                .isEqualTo("1/4 Node import");
+        assertThat(ProgressBar.describe(snapshot(ImportPhase.NODES, "Prepare node index", 1.0)))
+                .isEqualTo("1/4 Node import (Prepare node index)");
+        assertThat(ProgressBar.describe(snapshot(ImportPhase.LINKING, "Relationship <-- Relationship", 0.7)))
+                .isEqualTo("3/4 Relationship linking (Relationship <-- Relationship)");
     }
 
     @Test
-    void rendersBarPercentElapsedAndEta() {
-        String line = ProgressBar.render(0.5, Duration.ofMinutes(10));
+    void rendersBarPercentPhaseElapsedAndPhaseEta() {
+        String line = ProgressBar.render(
+                new ProgressSnapshot(ImportPhase.LINKING, "Node Degrees", 0.5, Duration.ofMinutes(10)),
+                Duration.ofHours(5));
 
         assertThat(line)
                 .startsWith("[" + "#".repeat(15) + "-".repeat(15) + "]")
                 .contains(" 50.0%")
-                .contains("Relationships")
-                .contains("elapsed 10m 00s")
-                .endsWith("ETA 10m 00s");
-    }
-
-    @Test
-    void saysFinalizingInsteadOfEtaWhenAllBytesAreRead() {
-        String line = ProgressBar.render(1.0, Duration.ofHours(2));
-
-        assertThat(line).contains("100.0%").contains("Finishing").endsWith("finalizing in neo4j");
+                .contains("3/4 Relationship linking (Node Degrees)")
+                .contains("elapsed 5h 00m")
+                .endsWith("phase ETA 10m 00s");
     }
 
     @Test
     void printsLinesWhileRunningAndFinalStateOnClose() {
         var out = new ByteArrayOutputStream();
         var tracker = new ProgressTracker(100);
-        tracker.add(100);
+        tracker.add(50);
 
         new ProgressBar(tracker, new PrintStream(out), false, Duration.ofMinutes(1)).start().close();
 
-        assertThat(out.toString(StandardCharsets.UTF_8).lines()).isNotEmpty().allSatisfy(line -> assertThat(line).contains("100.0%"));
+        assertThat(out.toString(StandardCharsets.UTF_8).lines()).isNotEmpty().allSatisfy(line -> assertThat(line).contains(" 50.0%"));
     }
 
     @Test
@@ -86,5 +83,9 @@ class ProgressBarTest {
 
         String output = out.toString(StandardCharsets.UTF_8);
         assertThat(output).startsWith("\r[").endsWith("\n");
+    }
+
+    private static ProgressSnapshot snapshot(ImportPhase phase, String stage, double fraction) {
+        return new ProgressSnapshot(phase, stage, fraction, Duration.ofMinutes(1));
     }
 }

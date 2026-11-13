@@ -9,12 +9,24 @@ import org.junit.jupiter.api.Test;
 class ProgressTrackerTest {
 
     @Test
-    void reportsFractionOfTotalBytes() {
+    void measuresNodeImportByTheBytesOfTheFirstPass() {
         var tracker = new ProgressTracker(200);
 
         tracker.add(50);
 
-        assertThat(tracker.fraction()).isEqualTo(0.25);
+        assertThat(tracker.snapshot().phase()).isEqualTo(ImportPhase.NODES);
+        assertThat(tracker.snapshot().fraction()).isEqualTo(0.25);
+    }
+
+    @Test
+    void measuresRelationshipImportByTheBytesOfTheSecondPass() {
+        var tracker = new ProgressTracker(200);
+        tracker.add(200);
+        tracker.stageStarted(ImportPhase.RELATIONSHIPS, "");
+
+        tracker.add(150);
+
+        assertThat(tracker.snapshot().fraction()).isEqualTo(0.75);
     }
 
     @Test
@@ -23,12 +35,48 @@ class ProgressTrackerTest {
 
         tracker.add(150);
 
-        assertThat(tracker.fraction()).isEqualTo(1.0);
+        assertThat(tracker.snapshot().fraction()).isEqualTo(1.0);
     }
 
     @Test
     void emptyInputIsComplete() {
-        assertThat(new ProgressTracker(0).fraction()).isEqualTo(1.0);
+        assertThat(new ProgressTracker(0).snapshot().fraction()).isEqualTo(1.0);
+    }
+
+    @Test
+    void takesTheProgressOfLaterPhasesFromTheImporter() {
+        var tracker = new ProgressTracker(100);
+        tracker.add(200);
+        tracker.stageStarted(ImportPhase.LINKING, "Node Degrees");
+
+        tracker.phaseProgress(0.4);
+
+        assertThat(tracker.snapshot())
+                .extracting(ProgressSnapshot::phase, ProgressSnapshot::stage, ProgressSnapshot::fraction)
+                .containsExactly(ImportPhase.LINKING, "Node Degrees", 0.4);
+    }
+
+    @Test
+    void keepsTheProgressWhenAnotherStageOfTheSamePhaseStarts() {
+        var tracker = new ProgressTracker(100);
+        tracker.stageStarted(ImportPhase.LINKING, "Node Degrees");
+        tracker.phaseProgress(0.4);
+
+        tracker.stageStarted(ImportPhase.LINKING, "Relationship --> Relationship");
+
+        assertThat(tracker.snapshot().fraction()).isEqualTo(0.4);
+        assertThat(tracker.snapshot().stage()).isEqualTo("Relationship --> Relationship");
+    }
+
+    @Test
+    void startsANewPhaseAtZero() {
+        var tracker = new ProgressTracker(100);
+        tracker.stageStarted(ImportPhase.LINKING, "Node Degrees");
+        tracker.phaseProgress(1.0);
+
+        tracker.stageStarted(ImportPhase.POST_PROCESSING, "Count groups");
+
+        assertThat(tracker.snapshot().fraction()).isZero();
     }
 
     @Test
@@ -45,6 +93,6 @@ class ProgressTrackerTest {
         executor.shutdown();
         executor.awaitTermination(10, TimeUnit.SECONDS);
 
-        assertThat(tracker.fraction()).isEqualTo(1.0);
+        assertThat(tracker.snapshot().fraction()).isEqualTo(1.0);
     }
 }

@@ -33,7 +33,7 @@ public final class WikidataImport implements Importer {
     public ImportResult run(ImportRequest request) throws IOException {
         Files.createDirectories(request.neo4jHome());
         createParentDirectories(request.errorLog());
-        var tracker = new ProgressTracker(2 * Files.size(request.jsonFile()));
+        var tracker = new ProgressTracker(Files.size(request.jsonFile()));
         var source = new DumpSource(request.jsonFile(), request.compression(), tracker::add);
         var input = new WikidataInput(source, request.chunkSize());
         try (var log = ImportLog.open(request.logFile());
@@ -48,11 +48,22 @@ public final class WikidataImport implements Importer {
                     try (var bar = new ProgressBar(
                                     tracker, barOutput, interactive, interactive ? INTERACTIVE_INTERVAL : LOG_INTERVAL)
                             .start()) {
-                        ImporterRunner.run(input, request.neo4jHome(), collector, log.tee(null), log.neo4jLogProvider());
+                        ImporterRunner.run(
+                                input,
+                                request.neo4jHome(),
+                                collector,
+                                log.tee(null),
+                                log.neo4jLogProvider(),
+                                tracker);
                     }
                 } else {
                     ImporterRunner.run(
-                            input, request.neo4jHome(), collector, log.tee(neo4jOutput), log.neo4jLogProvider());
+                            input,
+                            request.neo4jHome(),
+                            collector,
+                            log.tee(neo4jOutput),
+                            log.neo4jLogProvider(),
+                            tracker);
                 }
             } catch (IOException | RuntimeException e) {
                 log.error("Import failed after " + elapsedSince(start), e);

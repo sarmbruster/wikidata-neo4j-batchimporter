@@ -65,8 +65,8 @@ class WikidataImportEndToEndTest {
         assertThat(exitCode).as(err.toString()).isZero();
         assertThat(neo4jOutput.toString(StandardCharsets.UTF_8)).isEmpty();
         assertThat(barOutput.toString(StandardCharsets.UTF_8))
-                .contains("100.0%")
-                .contains("finalizing in neo4j");
+                .contains("1/4 Node import")
+                .contains("100.0%  4/4 Post processing");
         assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(19);
     }
 

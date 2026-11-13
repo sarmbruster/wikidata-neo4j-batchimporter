@@ -35,9 +35,24 @@ JAVA_OPTS="-Xmx8g" bin/wikidata-import.sh latest-all.json.bz2 /data/neo4j-home -
 | `--error-log=<file>` | `<path>.errors.log` | Receives relationships that cannot be resolved. |
 | `--chunk-size=<lines>` | `1000` | Dump lines read per chunk by each importer thread. |
 | `--log-file=<file>` | none | Log with UTC timestamps: start and end of the import, the Neo4j import stages with estimates, durations and peak memory, Neo4j's internal messages and the stack trace of a failure. |
-| `--progress` | off | Progress bar with elapsed time and ETA on stderr. Replaces the Neo4j progress output. |
+| `--progress` | off | Progress bar on stderr per import phase, with the running Neo4j stage, total elapsed time and an ETA for the current phase. Replaces the Neo4j progress output on stdout; with `--log-file` that output still goes to the log. |
 
 Exit codes: `0` success, `1` import failed, `2` invalid arguments.
+
+The progress bar follows the four phases of the Neo4j importer:
+
+```
+[#############-----------------]  43.2%  3/4 Relationship linking (Relationship <-- Relationship 1-38/9100)  elapsed 6h 12m  phase ETA 2h 05m
+```
+
+| Phase | Progress measured by |
+|---|---|
+| 1/4 Node import | bytes read in pass 1; `Prepare node index` follows at 100 % |
+| 2/4 Relationship import | bytes read in pass 2 |
+| 3/4 Relationship linking | relationships linked, as reported by Neo4j |
+| 4/4 Post processing | relationship groups and records processed, as reported by Neo4j |
+
+Linking runs in rounds when the relationship types do not fit into memory at once. The stage shows the type range of the round (`1-38/9100`). Every round scans the whole relationship store, so later rounds with few relationships take longer than their share of the percentage suggests.
 
 ## Release
 
@@ -82,5 +97,5 @@ flowchart LR
 
 ## Limitations
 
-- The ETA covers reading the dump only. Neo4j preparation between the passes and the final linking steps add to the total time.
+- The ETA covers the current phase only. With several linking rounds it is too optimistic during phase 3.
 - The import size estimates passed to Neo4j are derived from the file size and not tuned against a full dump.

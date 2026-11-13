@@ -53,7 +53,7 @@ public final class ProgressBar implements AutoCloseable {
 
     private void print() {
         Duration elapsed = Duration.ofNanos(System.nanoTime() - startNanos);
-        String line = render(tracker.fraction(), elapsed);
+        String line = render(tracker.snapshot(), elapsed);
         if (interactive) {
             out.print("\r" + line + CLEAR_TO_END_OF_LINE);
             out.flush();
@@ -62,29 +62,26 @@ public final class ProgressBar implements AutoCloseable {
         }
     }
 
-    static String render(double fraction, Duration elapsed) {
-        int filled = (int) Math.round(fraction * WIDTH);
+    static String render(ProgressSnapshot snapshot, Duration elapsed) {
+        int filled = (int) Math.round(snapshot.fraction() * WIDTH);
         String bar = "#".repeat(filled) + "-".repeat(WIDTH - filled);
-        String remaining = fraction >= 1.0 ? "finalizing in neo4j" : "ETA " + eta(fraction, elapsed);
         return String.format(
                 Locale.ROOT,
-                "[%s] %5.1f%%  %-13s elapsed %s  %s",
+                "[%s] %5.1f%%  %s  elapsed %s  phase ETA %s",
                 bar,
-                fraction * 100,
-                phase(fraction),
+                snapshot.fraction() * 100,
+                describe(snapshot),
                 format(elapsed),
-                remaining);
+                eta(snapshot.fraction(), snapshot.phaseElapsed()));
     }
 
-    static String phase(double fraction) {
-        if (fraction >= 1.0) {
-            return "Finishing";
-        }
-        return fraction < 0.5 ? "Nodes" : "Relationships";
+    static String describe(ProgressSnapshot snapshot) {
+        String phase = snapshot.phase().label();
+        return snapshot.stage().isEmpty() ? phase : phase + " (" + snapshot.stage() + ")";
     }
 
     static String eta(double fraction, Duration elapsed) {
-        if (fraction <= 0 || elapsed.compareTo(MIN_ELAPSED_FOR_ETA) < 0) {
+        if (fraction <= 0 || fraction >= 1.0 || elapsed.compareTo(MIN_ELAPSED_FOR_ETA) < 0) {
             return "--";
         }
         long remainingMillis = (long) (elapsed.toMillis() * (1 - fraction) / fraction);
