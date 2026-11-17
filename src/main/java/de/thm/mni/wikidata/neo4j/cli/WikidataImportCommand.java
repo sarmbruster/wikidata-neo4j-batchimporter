@@ -4,6 +4,7 @@ import de.thm.mni.wikidata.neo4j.ImportRequest;
 import de.thm.mni.wikidata.neo4j.ImportResult;
 import de.thm.mni.wikidata.neo4j.Importer;
 import de.thm.mni.wikidata.neo4j.dump.Compression;
+import de.thm.mni.wikidata.neo4j.neo4j.OffHeapMemory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -79,10 +80,20 @@ public class WikidataImportCommand implements Callable<Integer> {
                     + "file. Default: no log file.")
     Path logFile;
 
+    @Option(
+            names = "--max-off-heap-memory",
+            paramLabel = "<size>",
+            defaultValue = OffHeapMemory.DEFAULT,
+            description = "Memory for the neo4j importer caches outside the JVM heap, as size (e.g. 40g) or as "
+                    + "percentage of the available memory (Linux MemAvailable) minus the heap. Too little memory "
+                    + "makes relationship linking run in many rounds. Default: ${DEFAULT-VALUE}.")
+    String maxOffHeapMemory;
+
     @Override
     public Integer call() throws IOException {
         validate();
-        var request = new ImportRequest(jsonFile, compression, target, errorLog(), chunkSize, progress, logFile);
+        var request = new ImportRequest(
+                jsonFile, compression, target, errorLog(), chunkSize, progress, logFile, maxOffHeapMemoryBytes());
         try {
             ImportResult result = importer.run(request);
             report(result);
@@ -130,6 +141,14 @@ public class WikidataImportCommand implements Callable<Integer> {
 
     public int chunkSize() {
         return chunkSize;
+    }
+
+    public long maxOffHeapMemoryBytes() {
+        try {
+            return OffHeapMemory.resolve(maxOffHeapMemory);
+        } catch (IllegalArgumentException e) {
+            throw new ParameterException(spec.commandLine(), "--max-off-heap-memory: " + e.getMessage());
+        }
     }
 
     private void validate() throws IOException {

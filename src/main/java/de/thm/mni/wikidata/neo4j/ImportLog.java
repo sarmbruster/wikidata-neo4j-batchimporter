@@ -44,6 +44,10 @@ final class ImportLog implements AutoCloseable {
         write("INFO ", message);
     }
 
+    void warn(String message) {
+        write("WARN ", message);
+    }
+
     void error(String message, Throwable failure) {
         var stackTrace = new StringWriter();
         failure.printStackTrace(new PrintWriter(stackTrace));

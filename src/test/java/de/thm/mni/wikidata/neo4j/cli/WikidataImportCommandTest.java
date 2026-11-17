@@ -81,10 +81,30 @@ class WikidataImportCommandTest {
     void passesTheParsedOptionsToTheImporter() {
         Path target = tmp.resolve("db");
 
-        execute(dump, target, "--compression=gzip", "--chunk-size=7");
+        execute(dump, target, "--compression=gzip", "--chunk-size=7", "--max-off-heap-memory=40g");
 
-        assertThat(requests).containsExactly(
-                new ImportRequest(dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7, false, null));
+        assertThat(requests).containsExactly(new ImportRequest(
+                dump, Compression.GZIP, target, tmp.resolve("db.errors.log"), 7, false, null, 40L << 30));
+    }
+
+    @Test
+    void derivesTheOffHeapMemoryFromTheAvailableMemoryByDefault() {
+        execute(dump, tmp.resolve("db"));
+
+        assertThat(requests.getFirst().maxOffHeapMemory()).isPositive();
+    }
+
+    @Test
+    void rejectsInvalidOffHeapMemory() {
+        for (String value : new String[] {"lots", "0", "150%"}) {
+            err.getBuffer().setLength(0);
+
+            int exitCode = execute(dump, tmp.resolve("db"), "--max-off-heap-memory=" + value);
+
+            assertThat(exitCode).as(value).isEqualTo(2);
+            assertThat(err.toString()).as(value).contains("--max-off-heap-memory");
+        }
+        assertThat(requests).isEmpty();
     }
 
     @Test

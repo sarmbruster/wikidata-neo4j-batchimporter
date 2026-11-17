@@ -38,23 +38,34 @@ public final class ImporterRunner {
     private ImporterRunner() {
     }
 
-    public static void run(Input input, Path neo4jHome, Collector collector, PrintStream progress)
-            throws IOException {
-        run(input, neo4jHome, collector, progress, NullLogProvider.getInstance(), StageListener.NONE);
-    }
-
     /**
      * @param progress receives Neo4j's own stage report, may be {@code null}
      * @param stages receives the stage events of the importer
+     * @param monitor receives the sanity checks of the importer, e.g. memory warnings
+     * @param maxOffHeapMemory memory budget of the importer caches outside the heap, see {@link OffHeapMemory}
      */
-    public static void run(
-            Input input,
-            Path neo4jHome,
-            Collector collector,
+    public record Options(
             PrintStream progress,
             InternalLogProvider logProvider,
-            StageListener stages)
-            throws IOException {
+            StageListener stages,
+            Monitor monitor,
+            long maxOffHeapMemory) {
+
+        public static Options defaults() {
+            return new Options(
+                    null,
+                    NullLogProvider.getInstance(),
+                    StageListener.NONE,
+                    Monitor.NO_MONITOR,
+                    OffHeapMemory.resolve(OffHeapMemory.DEFAULT));
+        }
+    }
+
+    public static void run(Input input, Path neo4jHome, Collector collector) throws IOException {
+        run(input, neo4jHome, collector, Options.defaults());
+    }
+
+    public static void run(Input input, Path neo4jHome, Collector collector, Options options) throws IOException {
         Config config = Config.newBuilder()
                 .set(GraphDatabaseSettings.neo4j_home, neo4jHome.toAbsolutePath())
                 .build();
@@ -66,13 +77,13 @@ public final class ImporterRunner {
                             layout,
                             fileSystem,
                             PageCacheTracer.NULL,
-                            Configuration.DEFAULT,
-                            new SimpleLogService(logProvider),
-                            executionMonitor(progress, stages),
+                            configuration(options.maxOffHeapMemory()),
+                            new SimpleLogService(options.logProvider()),
+                            executionMonitor(options),
                             DefaultAdditionalIds.EMPTY,
                             new EmptyLogTailMetadata(config),
                             config,
-                            Monitor.NO_MONITOR,
+                            options.monitor(),
                             scheduler,
                             new ReadableIdCollector(collector),
                             TransactionLogInitializer.getLogFilesInitializer(),
@@ -83,12 +94,21 @@ public final class ImporterRunner {
         }
     }
 
-    private static ExecutionMonitor executionMonitor(PrintStream progress, StageListener stages) {
-        var stageMonitor = new StageProgressMonitor(stages);
-        if (progress == null) {
+    private static Configuration configuration(long maxOffHeapMemory) {
+        return new Configuration.Overridden(Configuration.DEFAULT) {
+            @Override
+            public long maxOffHeapMemory() {
+                return maxOffHeapMemory;
+            }
+        };
+    }
+
+    private static ExecutionMonitor executionMonitor(Options options) {
+        var stageMonitor = new StageProgressMonitor(options.stages());
+        if (options.progress() == null) {
             return stageMonitor;
         }
         return new MultiExecutionMonitor(
-                ExecutionMonitors.defaultVisible(Monitor.NO_MONITOR, progress, System.err), stageMonitor);
+                ExecutionMonitors.defaultVisible(options.monitor(), options.progress(), System.err), stageMonitor);
     }
 }

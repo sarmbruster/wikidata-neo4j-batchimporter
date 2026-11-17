@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.neo4j.batchimport.api.Monitor;
 import org.neo4j.internal.batchimport.input.BadCollector;
 import org.neo4j.internal.batchimport.input.Collectors;
 import org.neo4j.logging.NullLogProvider;
@@ -47,9 +48,12 @@ class StageProgressMonitorTest {
                 new WikidataInput(new DumpSource(Fixtures.path(Fixtures.MIXED), Compression.AUTO), 1000),
                 home,
                 Collectors.badCollector(new ByteArrayOutputStream(), BadCollector.UNLIMITED_TOLERANCE),
-                null,
-                NullLogProvider.getInstance(),
-                listener);
+                new ImporterRunner.Options(
+                        null,
+                        NullLogProvider.getInstance(),
+                        listener,
+                        Monitor.NO_MONITOR,
+                        OffHeapMemory.resolve(OffHeapMemory.DEFAULT)));
 
         assertThat(listener.phases)
                 .containsExactly(

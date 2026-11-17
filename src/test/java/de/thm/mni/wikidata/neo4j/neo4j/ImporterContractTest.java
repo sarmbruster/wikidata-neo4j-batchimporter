@@ -72,7 +72,7 @@ class ImporterContractTest {
     }
 
     private void runImport(Input input, Collector collector) throws IOException {
-        ImporterRunner.run(input, home, collector, null);
+        ImporterRunner.run(input, home, collector);
     }
 
     private long countRelationships() {

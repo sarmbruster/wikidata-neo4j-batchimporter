@@ -29,7 +29,7 @@ class WikidataInputTest {
         var errorLog = new ByteArrayOutputStream();
         var collector = Collectors.badCollector(errorLog, BadCollector.UNLIMITED_TOLERANCE);
 
-        ImporterRunner.run(new WikidataInput(source, 4), home, collector, null);
+        ImporterRunner.run(new WikidataInput(source, 4), home, collector);
 
         assertThat(source.opened).hasValue(2);
         assertThat(Neo4jHome.count(home, "MATCH (n:Entity:Item) RETURN count(n) AS c")).isEqualTo(5);
@@ -64,9 +64,7 @@ class WikidataInputTest {
 
         ImporterRunner.run(
                 new WikidataInput(new DumpSource(Fixtures.path(Fixtures.MIXED), Compression.AUTO), 1000),
-                home,
-                collector,
-                null);
+                home, collector);
 
         assertThat(collector.badEntries()).isEqualTo(1);
         assertThat(errorLog.toString(StandardCharsets.UTF_8)).contains("Q404404");
@@ -84,7 +82,7 @@ class WikidataInputTest {
         var errorLog = new ByteArrayOutputStream();
         var collector = Collectors.badCollector(errorLog, BadCollector.UNLIMITED_TOLERANCE);
 
-        ImporterRunner.run(new WikidataInput(new DumpSource(dump, Compression.NONE), 1000), home, collector, null);
+        ImporterRunner.run(new WikidataInput(new DumpSource(dump, Compression.NONE), 1000), home, collector);
 
         assertThat(collector.badEntries()).isEqualTo(1);
         assertThat(errorLog.toString(StandardCharsets.UTF_8)).contains("Qbroken");
@@ -98,9 +96,7 @@ class WikidataInputTest {
 
         ImporterRunner.run(
                 new WikidataInput(new DumpSource(Fixtures.path(Fixtures.MIXED), Compression.AUTO), 1000),
-                home,
-                collector,
-                null);
+                home, collector);
 
         assertThat(Neo4jHome.count(
                         home,

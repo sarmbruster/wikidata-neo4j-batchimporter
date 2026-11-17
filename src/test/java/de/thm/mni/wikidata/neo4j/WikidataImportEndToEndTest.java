@@ -75,11 +75,12 @@ class WikidataImportEndToEndTest {
         Path home = tmp.resolve("logged");
         Path logFile = tmp.resolve("import.log");
 
-        int exitCode = run(Fixtures.path(Fixtures.MIXED), home, "--log-file=" + logFile);
+        int exitCode = run(Fixtures.path(Fixtures.MIXED), home, "--log-file=" + logFile, "--max-off-heap-memory=2g");
 
         assertThat(exitCode).as(err.toString()).isZero();
         assertThat(Files.readString(logFile))
                 .contains("INFO  Importing " + Fixtures.path(Fixtures.MIXED))
+                .contains("INFO  Off-heap memory for neo4j 2.000GiB (available ")
                 .contains("Node import COMPLETED")
                 .contains("IMPORT DONE")
                 .contains("Import finished in")

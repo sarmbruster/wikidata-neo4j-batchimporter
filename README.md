@@ -24,7 +24,7 @@ bin/wikidata-import.sh <json-file> <path> [options]
 The script calls `java -jar tools.jar` and looks for `tools.jar` next to itself, then in `../target/`. Pass JVM options through `JAVA_OPTS`:
 
 ```
-JAVA_OPTS="-Xmx8g" bin/wikidata-import.sh latest-all.json.bz2 /data/neo4j-home --progress
+JAVA_OPTS="-Xmx4g" bin/wikidata-import.sh latest-all.json.gz /data/neo4j-home --progress --max-off-heap-memory=40g
 ```
 
 `<path>` is used as Neo4j home. It must not exist or must be empty. The database is created in `<path>/data/databases/neo4j` and opens with an embedded `DatabaseManagementServiceBuilder(<path>)` or as `NEO4J_HOME` of a Neo4j 5 server.
@@ -35,6 +35,7 @@ JAVA_OPTS="-Xmx8g" bin/wikidata-import.sh latest-all.json.bz2 /data/neo4j-home -
 | `--error-log=<file>` | `<path>.errors.log` | Receives relationships that cannot be resolved. |
 | `--chunk-size=<lines>` | `1000` | Dump lines read per chunk by each importer thread. |
 | `--log-file=<file>` | none | Log with UTC timestamps: start and end of the import, the Neo4j import stages with estimates, durations and peak memory, Neo4j's internal messages and the stack trace of a failure. |
+| `--max-off-heap-memory=<size>` | `90%` | Memory for Neo4j's importer caches outside the JVM heap: a size such as `40g` or a percentage (1–99) of the available memory (Linux `MemAvailable`) minus the heap. See [Memory](#memory). |
 | `--progress` | off | Progress bar on stderr per import phase, with the running Neo4j stage, total elapsed time and an ETA for the current phase. Replaces the Neo4j progress output on stdout; with `--log-file` that output still goes to the log. |
 
 Exit codes: `0` success, `1` import failed, `2` invalid arguments.
@@ -53,6 +54,14 @@ The progress bar follows the four phases of the Neo4j importer:
 | 4/4 Post processing | relationship groups and records processed, as reported by Neo4j |
 
 Linking runs in rounds when the relationship types do not fit into memory at once. The stage shows the type range of the round (`1-38/9100`). Every round scans the whole relationship store, so later rounds with few relationships take longer than their share of the percentage suggests.
+
+## Memory
+
+Most of the importer's memory lives outside the JVM heap: the id mapper during the two passes, and during linking the node cache (10 bytes per node) plus the relationship groups of dense nodes. Linking processes as many relationship types per round as fit into the off-heap budget left after the node cache. Every round scans the whole relationship store, so a small budget turns linking into thousands of rounds (one per type in the worst case).
+
+- Keep the heap small (`-Xmx4g` is enough) so the remaining RAM is available off-heap.
+- Set `--max-off-heap-memory` explicitly, e.g. `40g` on a 64 GB machine. Neo4j's own default takes 90 % of `MemFree`, which excludes the file system cache and is small on a machine that has just read a large file.
+- The log file records the chosen budget at the start, and the warnings of Neo4j's memory and heap sanity checks are written to the log and stderr.
 
 ## Release
 
