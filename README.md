@@ -86,6 +86,23 @@ The workflow runs the tests and attaches a ZIP with `tools.jar`, `wikidata-impor
 
 Qualifiers, references, sitelinks, lexemes and statements whose snak type is not `value` are ignored. Rationale in [docs/adr](docs/adr).
 
+## Indexes and constraints
+
+The Neo4j record format importer cannot create schema (`Input.schemaCommands()` is rejected), so the database only contains the label and relationship type lookup indexes. Create the indexes and constraints after the import, once the database is running:
+
+```cypher
+CREATE RANGE INDEX FOR (n:Entity) ON (n.label);
+CREATE RANGE INDEX FOR (n:GlobeCoordinate) ON (n.globe);
+CREATE RANGE INDEX FOR (n:Quantity) ON (n.unit);
+CREATE TEXT INDEX FOR (n:Entity) ON (n.label);
+CREATE CONSTRAINT claim_id FOR (node:Claim) REQUIRE (node.id) IS UNIQUE;
+CREATE CONSTRAINT entity_id FOR (node:Entity) REQUIRE (node.id) IS UNIQUE;
+```
+
+Every `:Item` and `:Property` is also an `:Entity`, so `entity_id` covers their ids; match on `:Entity` to use it.
+
+For example with `cypher-shell -f schema.cypher`. `CREATE INDEX` returns immediately and Neo4j populates the index in the background; wait with `CALL db.awaitIndexes()` or watch `SHOW INDEXES` until every index is `ONLINE`. `CREATE CONSTRAINT` blocks until its backing index is populated and fails if the data contains duplicate ids.
+
 ## How it works
 
 The Neo4j importer consumes all nodes before it asks for the first relationship. The tool therefore reads the dump twice instead of buffering relationships:
