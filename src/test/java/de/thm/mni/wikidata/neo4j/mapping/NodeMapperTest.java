@@ -3,8 +3,10 @@ package de.thm.mni.wikidata.neo4j.mapping;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.thm.mni.wikidata.neo4j.Fixtures;
+import de.thm.mni.wikidata.neo4j.model.DataValue.ClaimValue;
 import de.thm.mni.wikidata.neo4j.model.Entity;
 import de.thm.mni.wikidata.neo4j.model.EntityType;
+import de.thm.mni.wikidata.neo4j.model.Statement;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,6 +85,26 @@ class NodeMapperTest {
         NodeRecord url = nodes.getLast();
         assertThat(url.labels()).containsExactly("Claim", "Url");
         assertThat(url.properties()).containsEntry("value", "https://www.germany.example");
+    }
+
+    @Test
+    void keepsStatementIdOnClaimNodesWithEntityIdValues() {
+        List<NodeRecord> claims = mapper.map(entities.get("Q500")).subList(1, 5);
+
+        assertThat(claims).extracting(node -> node.properties().get("id"))
+                .containsExactly("Q500$1", "Q500$2", "Q500$3", "Q500$4");
+        assertThat(claims.getFirst().labels()).containsExactly("Claim", "EntitySchema");
+        assertThat(claims.getFirst().properties()).containsOnlyKeys("id", "value").containsEntry("value", "E206");
+    }
+
+    @Test
+    void neverOverwritesTheStatementIdWithAValueField() {
+        var statement = new Statement("Q1$1", "P1", new ClaimValue("custom", Map.of("id", "X1", "text", "t")));
+        var entity = new Entity("Q1", EntityType.ITEM, "", List.of(), List.of(), null, List.of(statement));
+
+        NodeRecord claim = mapper.map(entity).getLast();
+
+        assertThat(claim.properties()).containsEntry("id", "Q1$1").containsEntry("text", "t");
     }
 
     @Test

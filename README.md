@@ -81,6 +81,7 @@ The workflow runs the tests and attaches a ZIP with `tools.jar`, `wikidata-impor
 | Item, property | `(:Entity:Item)` / `(:Entity:Property)` with `id`, `label`, `slug`, `descriptions`, `aliases` (English only); properties also have `datatype` |
 | Statement with item or property value | `(Entity)-[:<PROPERTY_LABEL> {by, id}]->(Entity)`; `PROPERTY_LABEL` is the upper-cased English label of the property, `CLAIM` if unknown |
 | Statement with any other value | `(Entity)-[:<PROPERTY_LABEL> {by}]->(:Claim:<Datatype>)`, e.g. `:Claim:Quantity`; the `id` property holds the statement id |
+| Statement whose value references a lexeme, form, sense or entity schema | `:Claim:<Datatype>` node as above with the referenced id in `value`, e.g. `(:Claim:EntitySchema {id: 'Q42$…', value: 'E206'})` |
 | Quantity unit, globe coordinate globe | `(:Quantity)-[:UNIT_TYPE]->(Entity)`, `(:GlobeCoordinate)-[:GLOBE_TYPE]->(Entity)`; `unit` / `globe` are removed from the node when they hold an entity URL |
 
 Qualifiers, references, sitelinks, lexemes and statements whose snak type is not `value` are ignored. Rationale in [docs/adr](docs/adr).

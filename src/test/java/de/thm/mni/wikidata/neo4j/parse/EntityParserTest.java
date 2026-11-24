@@ -117,6 +117,17 @@ class EntityParserTest {
     }
 
     @Test
+    void reducesValuesReferencingOtherEntityKindsToTheirId() {
+        Entity example = mixed().get("Q500");
+
+        assertThat(example.statements()).extracting(Statement::value).containsExactly(
+                new ClaimValue("entity-schema", Map.of("value", "E206")),
+                new ClaimValue("entity-schema", Map.of("value", "E206")),
+                new ClaimValue("wikibase-lexeme", Map.of("value", "L485")),
+                new ClaimValue("wikibase-form", Map.of("value", "L1-F1")));
+    }
+
+    @Test
     void ignoresUnsupportedEntityTypes() {
         assertThat(parser.parse("{\"type\":\"lexeme\",\"id\":\"L1\"}")).isEmpty();
     }

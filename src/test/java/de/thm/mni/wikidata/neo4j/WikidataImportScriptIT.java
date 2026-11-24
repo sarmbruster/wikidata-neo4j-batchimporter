@@ -38,7 +38,7 @@ class WikidataImportScriptIT {
 
         assertThat(finished).isTrue();
         assertThat(process.exitValue()).as(output).isZero();
-        assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(19);
+        assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(24);
         assertThat(Neo4jHome.count(home, "MATCH ()-[r:INSTANCE_OF]->() RETURN count(r) AS c")).isEqualTo(1);
         assertThat(tmp.resolve("db.errors.log")).exists();
         assertThat(Files.readString(logFile))

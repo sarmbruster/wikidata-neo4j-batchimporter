@@ -33,6 +33,7 @@ class WikidataImportEndToEndTest {
         assertThat(Neo4jHome.count(home, "MATCH (n:Entity:Item) RETURN count(n) AS c")).isEqualTo(99);
         assertThat(Neo4jHome.count(home, "MATCH (n:Claim) RETURN count(n) AS c")).isPositive();
         assertThat(Neo4jHome.count(home, "MATCH (:Item {id:'Q31'})-[r]->(:Item) RETURN count(r) AS c")).isPositive();
+        assertThat(Neo4jHome.count(home, "MATCH (c:Claim) RETURN count(c) - count(DISTINCT c.id) AS c")).isZero();
         assertThat(tmp.resolve("db.errors.log")).exists();
         assertThat(out.toString()).contains("Neo4j database created");
     }
@@ -44,8 +45,9 @@ class WikidataImportEndToEndTest {
         int exitCode = run(Fixtures.path(Fixtures.MIXED), home);
 
         assertThat(exitCode).as(err.toString()).isZero();
-        assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(19);
+        assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(24);
         assertThat(Neo4jHome.count(home, "MATCH ()-[r:INSTANCE_OF]->() RETURN count(r) AS c")).isEqualTo(1);
+        assertThat(Neo4jHome.count(home, "MATCH (c:Claim) RETURN count(c) - count(DISTINCT c.id) AS c")).isZero();
         assertThat(Files.readString(tmp.resolve("mixed.errors.log"))).contains("Q404404");
         assertThat(out.toString()).contains("1 relationships could not be resolved");
     }
@@ -67,7 +69,7 @@ class WikidataImportEndToEndTest {
         assertThat(barOutput.toString(StandardCharsets.UTF_8))
                 .contains("1/4 Node import")
                 .contains("100.0%  4/4 Post processing");
-        assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(19);
+        assertThat(Neo4jHome.count(home, "MATCH (n) RETURN count(n) AS c")).isEqualTo(24);
     }
 
     @Test

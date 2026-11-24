@@ -32,10 +32,10 @@ class WikidataInputTest {
         ImporterRunner.run(new WikidataInput(source, 4), home, collector);
 
         assertThat(source.opened).hasValue(2);
-        assertThat(Neo4jHome.count(home, "MATCH (n:Entity:Item) RETURN count(n) AS c")).isEqualTo(5);
+        assertThat(Neo4jHome.count(home, "MATCH (n:Entity:Item) RETURN count(n) AS c")).isEqualTo(6);
         assertThat(Neo4jHome.count(home, "MATCH (n:Entity:Property) RETURN count(n) AS c")).isEqualTo(9);
-        assertThat(Neo4jHome.count(home, "MATCH (n:Claim) RETURN count(n) AS c")).isEqualTo(5);
-        assertThat(Neo4jHome.count(home, "MATCH ()-[r]->() RETURN count(r) AS c")).isEqualTo(10);
+        assertThat(Neo4jHome.count(home, "MATCH (n:Claim) RETURN count(n) AS c")).isEqualTo(9);
+        assertThat(Neo4jHome.count(home, "MATCH ()-[r]->() RETURN count(r) AS c")).isEqualTo(14);
         assertThat(Neo4jHome.count(
                         home,
                         "MATCH (:Item {id:'Q100'})-[r:INSTANCE_OF {by:'P31', id:'Q100$1'}]->(:Item {id:'Q200'}) "
@@ -55,6 +55,12 @@ class WikidataInputTest {
                         home,
                         "MATCH (:Claim:GlobeCoordinate)-[:GLOBE_TYPE]->(:Item {id:'Q2'}) RETURN count(*) AS c"))
                 .isEqualTo(1);
+        assertThat(Neo4jHome.count(
+                        home,
+                        "MATCH (:Item {id:'Q500'})-->(c:Claim:EntitySchema {value:'E206'}) "
+                                + "WHERE c.id IN ['Q500$1', 'Q500$2'] AND c.`entity-type` IS NULL "
+                                + "AND c.`numeric-id` IS NULL RETURN count(DISTINCT c.id) AS c"))
+                .isEqualTo(2);
     }
 
     @Test

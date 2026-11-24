@@ -16,6 +16,7 @@ public class NodeMapper {
     static final String ENTITY_LABEL = "Entity";
     static final String CLAIM_LABEL = "Claim";
     static final String ENTITY_URL_PREFIX = "http";
+    static final String ID = "id";
 
     private final PropertyIndex propertyIndex;
 
@@ -57,9 +58,9 @@ public class NodeMapper {
 
     private NodeRecord claimNode(String nodeKey, String statementId, ClaimValue claim) {
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put("id", statementId);
+        properties.put(ID, statementId);
         claim.fields().forEach((key, value) -> {
-            if (!isEntityReference(key, value)) {
+            if (!key.equals(ID) && !isEntityReference(key, value)) {
                 properties.put(key, storable(value));
             }
         });

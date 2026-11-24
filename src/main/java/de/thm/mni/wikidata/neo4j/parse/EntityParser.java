@@ -254,6 +254,9 @@ public final class EntityParser {
             }
             return null;
         }
+        if (raw instanceof Map<?, ?> map && map.containsKey("entity-type") && map.get("id") instanceof String id) {
+            return new ClaimValue(datatype, Map.of("value", id));
+        }
         if (raw instanceof Map<?, ?> map) {
             return new ClaimValue(datatype, (Map<String, Object>) map);
         }
